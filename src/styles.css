@@ -18,7 +18,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -183,6 +184,41 @@ label span {
 
 .chips.muted button {
   background: #ffffff;
+}
+
+.filter-chips button.filter-active {
+  background: var(--primary);
+  color: #ffffff;
+  border-color: var(--primary);
+}
+
+select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 12px;
+  color: #172033;
+  background: #ffffff;
+}
+
+select.input-error {
+  border-color: #e11d48;
+  background: #fff1f2;
+}
+
+.tag {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, #ffffff);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, #dbe3ef);
+  vertical-align: middle;
+  margin-left: 6px;
 }
 
 .section-heading {

@@ -34,6 +34,7 @@ const project = {
     "钻孔编号",
     "孔深",
     "分层深度",
+    "岩性分类",
     "岩性描述",
     "土色",
     "标贯击数",
@@ -70,6 +71,7 @@ interface DrillingRecord {
   "钻孔编号": string;
   "孔深": string;
   "分层深度": string;
+  "岩性分类": string;
   "岩性描述": string;
   "土色": string;
   "标贯击数": string;
@@ -81,6 +83,7 @@ const initialRecords: DrillingRecord[] = [
     "钻孔编号": "ZK-18",
     "孔深": "22.6",
     "分层深度": "0-22.6",
+    "岩性分类": "黏土",
     "岩性描述": "粉质黏土",
     "土色": "褐黄色",
     "标贯击数": "12",
@@ -90,6 +93,7 @@ const initialRecords: DrillingRecord[] = [
     "钻孔编号": "ZK-21",
     "孔深": "31.2",
     "分层深度": "0-31.2",
+    "岩性分类": "卵石",
     "岩性描述": "卵石层",
     "土色": "杂色",
     "标贯击数": "31",
@@ -99,10 +103,21 @@ const initialRecords: DrillingRecord[] = [
     "钻孔编号": "ZK-24",
     "孔深": "18.4",
     "分层深度": "0-18.4",
+    "岩性分类": "强风化",
     "岩性描述": "强风化泥岩",
     "土色": "紫红色",
     "标贯击数": "50",
     "地下水位": "5.2"
+  },
+  {
+    "钻孔编号": "ZK-27",
+    "孔深": "15.8",
+    "分层深度": "0-15.8",
+    "岩性分类": "粉砂",
+    "岩性描述": "粉砂层",
+    "土色": "灰白色",
+    "标贯击数": "8",
+    "地下水位": "4.1"
   }
 ];
 
@@ -110,6 +125,7 @@ const emptyForm: DrillingRecord = {
   "钻孔编号": "",
   "孔深": "",
   "分层深度": "",
+  "岩性分类": "",
   "岩性描述": "",
   "土色": "",
   "标贯击数": "",
@@ -132,16 +148,22 @@ function App() {
   const [formData, setFormData] = useState<DrillingRecord>(emptyForm);
   const [records, setRecords] = useState<DrillingRecord[]>(initialRecords);
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+
+  const filteredRecords = useMemo(() => {
+    if (!activeFilter) return records;
+    return records.filter(r => r["岩性分类"] === activeFilter);
+  }, [records, activeFilter]);
 
   const metrics = useMemo(() => {
-    const totalDepth = records.reduce((sum, r) => sum + (parseFloat(r["孔深"]) || 0), 0);
-    const layerCount = records.length;
-    const maxSPT = records.reduce((max, r) => {
+    const totalDepth = filteredRecords.reduce((sum, r) => sum + (parseFloat(r["孔深"]) || 0), 0);
+    const layerCount = filteredRecords.length;
+    const maxSPT = filteredRecords.reduce((max, r) => {
       const spt = parseFloat(r["标贯击数"]);
       return isNaN(spt) ? max : Math.max(max, spt);
     }, 0);
-    const avgWaterLevel = records.length > 0
-      ? records.reduce((sum, r) => sum + (parseFloat(r["地下水位"]) || 0), 0) / records.length
+    const avgWaterLevel = filteredRecords.length > 0
+      ? filteredRecords.reduce((sum, r) => sum + (parseFloat(r["地下水位"]) || 0), 0) / filteredRecords.length
       : 0;
 
     return [
@@ -150,7 +172,7 @@ function App() {
       String(maxSPT) + "击",
       avgWaterLevel.toFixed(1) + "m"
     ];
-  }, [records]);
+  }, [filteredRecords]);
 
   const handleInputChange = (field: FieldName, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -198,6 +220,7 @@ function App() {
       "钻孔编号": formData["钻孔编号"].trim(),
       "孔深": formData["孔深"].trim(),
       "分层深度": formData["分层深度"].trim(),
+      "岩性分类": formData["岩性分类"].trim(),
       "岩性描述": formData["岩性描述"].trim(),
       "土色": formData["土色"].trim(),
       "标贯击数": formData["标贯击数"].trim(),
@@ -237,10 +260,16 @@ function App() {
               <span key={user}>{user}</span>
             ))}
           </div>
-          <h2>筛选</h2>
-          <div className="chips muted">
+          <h2>现场筛选</h2>
+          <div className="chips filter-chips">
             {project.filters.map((filter: string) => (
-              <button key={filter}>{filter}</button>
+              <button
+                key={filter}
+                className={activeFilter === filter ? "filter-active" : ""}
+                onClick={() => setActiveFilter(prev => prev === filter ? null : filter)}
+              >
+                {filter}
+              </button>
             ))}
           </div>
         </aside>
@@ -257,12 +286,25 @@ function App() {
             {project.fields.map((field: FieldName) => (
               <label key={field}>
                 <span>{field}</span>
-                <input
-                  className={errors[field] ? "input-error" : ""}
-                  placeholder={"填写" + field}
-                  value={formData[field]}
-                  onChange={(e) => handleInputChange(field, e.target.value)}
-                />
+                {field === "岩性分类" ? (
+                  <select
+                    className={errors[field] ? "input-error" : ""}
+                    value={formData[field]}
+                    onChange={(e) => handleInputChange(field, e.target.value)}
+                  >
+                    <option value="">选择岩性分类</option>
+                    {project.filters.map((f: string) => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    className={errors[field] ? "input-error" : ""}
+                    placeholder={"填写" + field}
+                    value={formData[field]}
+                    onChange={(e) => handleInputChange(field, e.target.value)}
+                  />
+                )}
                 {errors[field] && <em className="error-tip">{errors[field]}</em>}
               </label>
             ))}
@@ -274,16 +316,16 @@ function App() {
         <div className="section-heading">
           <div>
             <p>钻孔数据</p>
-            <h2>近期记录</h2>
+            <h2>近期记录{activeFilter ? ` · ${activeFilter}` : ""}</h2>
           </div>
           <button>导出摘要</button>
         </div>
         <div className="record-list">
-          {records.map((record, index: number) => (
+          {filteredRecords.map((record, index: number) => (
             <article key={record["钻孔编号"] + "-" + index} className="record-card">
               <div className="record-index">{String(index + 1).padStart(2, "0")}</div>
               <div>
-                <h3>{record["钻孔编号"]}</h3>
+                <h3>{record["钻孔编号"]} <span className="tag">{record["岩性分类"]}</span></h3>
                 <p>
                   孔深{record["孔深"]}m · {record["岩性描述"]} · {record["土色"]} ·
                   分层{record["分层深度"]}m · 标贯{record["标贯击数"]}击 · 水位{record["地下水位"]}m
