@@ -1,5 +1,50 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import "./styles.css";
+
+interface StratumLayer {
+  id: string;
+  startDepth: string;
+  endDepth: string;
+  lithology: string;
+  soilColor: string;
+  density: string;
+  description: string;
+}
+
+interface BoreholeLayers {
+  [boreholeId: string]: StratumLayer[];
+}
+
+const lithologyOptions = ["黏土", "粉质黏土", "粉土", "粉砂", "细砂", "中砂", "粗砂", "卵石", "圆砾", "强风化岩", "中风化岩", "微风化岩"];
+const soilColorOptions = ["褐黄色", "黄褐色", "灰黄色", "灰白色", "灰色", "灰褐色", "紫红色", "杂色"];
+const densityOptions = ["松散", "稍密", "中密", "密实", "可塑", "硬塑", "坚硬", "流塑"];
+
+const generateId = () => Math.random().toString(36).slice(2, 11);
+
+const initialLayers: BoreholeLayers = {
+  "ZK-18": [
+    { id: generateId(), startDepth: "0", endDepth: "3.2", lithology: "粉质黏土", soilColor: "褐黄色", density: "可塑", description: "含少量铁锰氧化物斑点，稍有光泽" },
+    { id: generateId(), startDepth: "3.2", endDepth: "8.5", lithology: "粉土", soilColor: "灰黄色", density: "中密", description: "夹薄层粉砂，摇振反应中等" },
+    { id: generateId(), startDepth: "8.5", endDepth: "15.8", lithology: "粉砂", soilColor: "灰白色", density: "密实", description: "矿物成分以石英、长石为主" },
+    { id: generateId(), startDepth: "15.8", endDepth: "22.6", lithology: "卵石", soilColor: "杂色", density: "中密", description: "磨圆度较好，充填中粗砂" },
+  ],
+  "ZK-21": [
+    { id: generateId(), startDepth: "0", endDepth: "2.5", lithology: "粉质黏土", soilColor: "褐黄色", density: "硬塑", description: "表层为耕植土，含植物根系" },
+    { id: generateId(), startDepth: "2.5", endDepth: "12.0", lithology: "圆砾", soilColor: "灰白色", density: "稍密", description: "颗粒级配一般，充填砂粒" },
+    { id: generateId(), startDepth: "12.0", endDepth: "25.5", lithology: "卵石", soilColor: "杂色", density: "中密", description: "岩性以砂岩、灰岩为主" },
+    { id: generateId(), startDepth: "25.5", endDepth: "31.2", lithology: "强风化岩", soilColor: "紫红色", density: "坚硬", description: "岩芯破碎，呈碎块状" },
+  ],
+  "ZK-24": [
+    { id: generateId(), startDepth: "0", endDepth: "4.8", lithology: "黏土", soilColor: "褐黄色", density: "可塑", description: "含铁锰结核，干强度高" },
+    { id: generateId(), startDepth: "4.8", endDepth: "10.2", lithology: "粉砂", soilColor: "灰黄色", density: "中密", description: "饱和状态，矿物成分石英为主" },
+    { id: generateId(), startDepth: "10.2", endDepth: "18.4", lithology: "强风化岩", soilColor: "紫红色", density: "坚硬", description: "泥岩，岩芯较破碎" },
+  ],
+  "ZK-27": [
+    { id: generateId(), startDepth: "0", endDepth: "1.8", lithology: "粉质黏土", soilColor: "褐黄色", density: "可塑", description: "含少量粉砂，稍有光泽" },
+    { id: generateId(), startDepth: "1.8", endDepth: "7.5", lithology: "粉砂", soilColor: "灰白色", density: "稍密", description: "颗粒均匀，级配不良" },
+    { id: generateId(), startDepth: "7.5", endDepth: "15.8", lithology: "细砂", soilColor: "灰黄色", density: "中密", description: "夹粉土薄层，饱和" },
+  ],
+};
 
 const project = {
   "id": "hxwl-03",
@@ -144,6 +189,15 @@ function MetricCard({ label, value, index }: { label: string; value: string; ind
   );
 }
 
+const emptyLayerForm: Omit<StratumLayer, "id"> = {
+  startDepth: "",
+  endDepth: "",
+  lithology: "",
+  soilColor: "",
+  density: "",
+  description: ""
+};
+
 function App() {
   const [formData, setFormData] = useState<DrillingRecord>(emptyForm);
   const [records, setRecords] = useState<DrillingRecord[]>(initialRecords);
@@ -151,6 +205,258 @@ function App() {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+
+  const [boreholeLayers, setBoreholeLayers] = useState<BoreholeLayers>(initialLayers);
+  const [selectedBorehole, setSelectedBorehole] = useState<string | null>("ZK-18");
+  const [layerForm, setLayerForm] = useState<Omit<StratumLayer, "id">>(emptyLayerForm);
+  const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
+  const [layerErrors, setLayerErrors] = useState<Partial<Record<keyof StratumLayer, string>>>({});
+  const [layerValidationMessage, setLayerValidationMessage] = useState<string>("");
+  const [gapMessage, setGapMessage] = useState<string>("");
+
+  const currentLayers = useMemo(() => {
+    if (!selectedBorehole) return [];
+    return boreholeLayers[selectedBorehole] || [];
+  }, [boreholeLayers, selectedBorehole]);
+
+  const selectedRecord = useMemo(() => {
+    if (!selectedBorehole) return null;
+    return records.find(r => r["钻孔编号"] === selectedBorehole) || null;
+  }, [records, selectedBorehole]);
+
+  const holeDepth = useMemo(() => {
+    if (!selectedRecord) return 0;
+    return parseFloat(selectedRecord["孔深"]) || 0;
+  }, [selectedRecord]);
+
+  const sortedLayers = useMemo(() => {
+    return [...currentLayers].sort((a, b) => parseFloat(a.startDepth) - parseFloat(b.startDepth));
+  }, [currentLayers]);
+
+  const validateLayerForm = useCallback((): { valid: boolean; errors: Partial<Record<keyof StratumLayer, string>> } => {
+    const errs: Partial<Record<keyof StratumLayer, string>> = {};
+
+    if (!layerForm.startDepth.trim()) {
+      errs.startDepth = "起始深度不能为空";
+    } else if (isNaN(parseFloat(layerForm.startDepth)) || parseFloat(layerForm.startDepth) < 0) {
+      errs.startDepth = "起始深度必须为非负数";
+    }
+
+    if (!layerForm.endDepth.trim()) {
+      errs.endDepth = "终止深度不能为空";
+    } else if (isNaN(parseFloat(layerForm.endDepth)) || parseFloat(layerForm.endDepth) < 0) {
+      errs.endDepth = "终止深度必须为非负数";
+    }
+
+    if (!layerForm.lithology.trim()) {
+      errs.lithology = "岩性不能为空";
+    }
+
+    if (!layerForm.soilColor.trim()) {
+      errs.soilColor = "土色不能为空";
+    }
+
+    if (!layerForm.density.trim()) {
+      errs.density = "密实度/状态不能为空";
+    }
+
+    const start = parseFloat(layerForm.startDepth);
+    const end = parseFloat(layerForm.endDepth);
+
+    if (!isNaN(start) && !isNaN(end) && start >= end) {
+      errs.endDepth = "终止深度必须大于起始深度";
+    }
+
+    if (!isNaN(end) && holeDepth > 0 && end > holeDepth) {
+      errs.endDepth = `终止深度不能超过钻孔深度(${holeDepth}m)`;
+    }
+
+    return { valid: Object.keys(errs).length === 0, errors: errs };
+  }, [layerForm, holeDepth]);
+
+  const checkOverlapAndGaps = useCallback(() => {
+    const layers = [...currentLayers];
+    if (editingLayerId) {
+      const idx = layers.findIndex(l => l.id === editingLayerId);
+      if (idx !== -1) layers.splice(idx, 1);
+    }
+
+    const start = parseFloat(layerForm.startDepth);
+    const end = parseFloat(layerForm.endDepth);
+
+    if (isNaN(start) || isNaN(end)) return { hasOverlap: false, gaps: [] as string[] };
+
+    let hasOverlap = false;
+    for (const layer of layers) {
+      const ls = parseFloat(layer.startDepth);
+      const le = parseFloat(layer.endDepth);
+      if (start < le && end > ls) {
+        hasOverlap = true;
+        break;
+      }
+    }
+
+    const allLayers = [...layers, { ...layerForm, id: "temp" } as StratumLayer]
+      .sort((a, b) => parseFloat(a.startDepth) - parseFloat(b.startDepth));
+
+    const gaps: string[] = [];
+    let prevEnd = 0;
+    for (const layer of allLayers) {
+      const ls = parseFloat(layer.startDepth);
+      if (ls > prevEnd + 0.001) {
+        gaps.push(`${prevEnd.toFixed(2)}m ~ ${ls.toFixed(2)}m`);
+      }
+      prevEnd = Math.max(prevEnd, parseFloat(layer.endDepth));
+    }
+    if (holeDepth > 0 && prevEnd < holeDepth - 0.001) {
+      gaps.push(`${prevEnd.toFixed(2)}m ~ ${holeDepth.toFixed(2)}m`);
+    }
+
+    return { hasOverlap, gaps };
+  }, [currentLayers, editingLayerId, layerForm, holeDepth]);
+
+  const layerValidation = useMemo(() => {
+    const { valid, errors: formErrors } = validateLayerForm();
+    if (!valid) return { valid: false, message: "" };
+
+    const { hasOverlap, gaps } = checkOverlapAndGaps();
+    if (hasOverlap) {
+      return { valid: false, message: "该层与现有分层深度重叠，请调整" };
+    }
+
+    return { valid: true, message: "", gaps };
+  }, [validateLayerForm, checkOverlapAndGaps]);
+
+  const handleLayerInputChange = (field: keyof Omit<StratumLayer, "id">, value: string) => {
+    setLayerForm(prev => ({ ...prev, [field]: value }));
+    if (layerErrors[field]) {
+      setLayerErrors(prev => ({ ...prev, [field]: undefined }));
+    }
+  };
+
+  const handleAddLayer = () => {
+    const { valid, errors: formErrors } = validateLayerForm();
+    setLayerErrors(formErrors);
+
+    if (!valid) return;
+
+    const { hasOverlap, gaps } = checkOverlapAndGaps();
+    if (hasOverlap) {
+      setLayerValidationMessage("该层与现有分层深度重叠，请调整深度范围");
+      return;
+    }
+
+    if (!selectedBorehole) return;
+
+    const newLayer: StratumLayer = {
+      ...layerForm,
+      id: generateId()
+    };
+
+    setBoreholeLayers(prev => {
+      const existing = prev[selectedBorehole] || [];
+      return { ...prev, [selectedBorehole]: [...existing, newLayer] };
+    });
+
+    setLayerForm(emptyLayerForm);
+    setLayerErrors({});
+    setLayerValidationMessage("");
+  };
+
+  const handleUpdateLayer = () => {
+    const { valid, errors: formErrors } = validateLayerForm();
+    setLayerErrors(formErrors);
+
+    if (!valid || !editingLayerId || !selectedBorehole) return;
+
+    const { hasOverlap } = checkOverlapAndGaps();
+    if (hasOverlap) {
+      setLayerValidationMessage("该层与现有分层深度重叠，请调整深度范围");
+      return;
+    }
+
+    setBoreholeLayers(prev => {
+      const existing = prev[selectedBorehole] || [];
+      return {
+        ...prev,
+        [selectedBorehole]: existing.map(l =>
+          l.id === editingLayerId ? { ...layerForm, id: editingLayerId } : l
+        )
+      };
+    });
+
+    setLayerForm(emptyLayerForm);
+    setEditingLayerId(null);
+    setLayerErrors({});
+    setLayerValidationMessage("");
+  };
+
+  const handleEditLayer = (layer: StratumLayer) => {
+    setLayerForm({
+      startDepth: layer.startDepth,
+      endDepth: layer.endDepth,
+      lithology: layer.lithology,
+      soilColor: layer.soilColor,
+      density: layer.density,
+      description: layer.description
+    });
+    setEditingLayerId(layer.id);
+    setLayerErrors({});
+    setLayerValidationMessage("");
+  };
+
+  const handleDeleteLayer = (layerId: string) => {
+    if (!selectedBorehole) return;
+    setBoreholeLayers(prev => {
+      const existing = prev[selectedBorehole] || [];
+      return { ...prev, [selectedBorehole]: existing.filter(l => l.id !== layerId) };
+    });
+    if (editingLayerId === layerId) {
+      setLayerForm(emptyLayerForm);
+      setEditingLayerId(null);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setLayerForm(emptyLayerForm);
+    setEditingLayerId(null);
+    setLayerErrors({});
+    setLayerValidationMessage("");
+  };
+
+  const handleSelectBorehole = (boreholeId: string) => {
+    setSelectedBorehole(boreholeId);
+    setLayerForm(emptyLayerForm);
+    setEditingLayerId(null);
+    setLayerErrors({});
+    setLayerValidationMessage("");
+  };
+
+  useEffect(() => {
+    if (sortedLayers.length === 0 || holeDepth === 0) {
+      setGapMessage("");
+      return;
+    }
+
+    const gaps: string[] = [];
+    let prevEnd = 0;
+    for (const layer of sortedLayers) {
+      const ls = parseFloat(layer.startDepth);
+      if (ls > prevEnd + 0.001) {
+        gaps.push(`${prevEnd.toFixed(2)}m ~ ${ls.toFixed(2)}m`);
+      }
+      prevEnd = Math.max(prevEnd, parseFloat(layer.endDepth));
+    }
+    if (prevEnd < holeDepth - 0.001) {
+      gaps.push(`${prevEnd.toFixed(2)}m ~ ${holeDepth.toFixed(2)}m`);
+    }
+
+    if (gaps.length > 0) {
+      setGapMessage(`存在缺口区间：${gaps.join("、")}`);
+    } else {
+      setGapMessage("");
+    }
+  }, [sortedLayers, holeDepth]);
 
   const filteredRecords = useMemo(() => {
     if (!activeFilter) return records;
@@ -285,8 +591,9 @@ function App() {
   const handleAddRecord = () => {
     if (!validate()) return;
 
+    const boreholeId = formData["钻孔编号"].trim();
     const trimmedRecord: DrillingRecord = {
-      "钻孔编号": formData["钻孔编号"].trim(),
+      "钻孔编号": boreholeId,
       "孔深": formData["孔深"].trim(),
       "分层深度": formData["分层深度"].trim(),
       "岩性分类": formData["岩性分类"].trim(),
@@ -297,6 +604,7 @@ function App() {
     };
 
     setRecords(prev => [trimmedRecord, ...prev]);
+    setBoreholeLayers(prev => ({ ...prev, [boreholeId]: [] }));
     setFormData(emptyForm);
     setErrors({});
   };
@@ -381,27 +689,226 @@ function App() {
         </section>
       </section>
 
-      <section className="records panel">
-        <div className="section-heading">
-          <div>
-            <p>钻孔数据</p>
-            <h2>近期记录{activeFilter ? ` · ${activeFilter}` : ""}</h2>
+      <section className="records-section">
+        <div className="panel borehole-list-panel">
+          <div className="section-heading">
+            <div>
+              <p>钻孔数据</p>
+              <h2>选择钻孔</h2>
+            </div>
+            <button onClick={() => setShowPreview(true)}>导出摘要</button>
           </div>
-          <button onClick={() => setShowPreview(true)}>导出摘要</button>
+          <div className="borehole-list">
+            {filteredRecords.map((record, index: number) => (
+              <article
+                key={record["钻孔编号"] + "-" + index}
+                className={`borehole-item ${selectedBorehole === record["钻孔编号"] ? "borehole-selected" : ""}`}
+                onClick={() => handleSelectBorehole(record["钻孔编号"])}
+              >
+                <div className="borehole-index">{String(index + 1).padStart(2, "0")}</div>
+                <div className="borehole-info">
+                  <h3>{record["钻孔编号"]} <span className="tag">{record["岩性分类"]}</span></h3>
+                  <p>孔深{record["孔深"]}m · {record["岩性描述"]}</p>
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
-        <div className="record-list">
-          {filteredRecords.map((record, index: number) => (
-            <article key={record["钻孔编号"] + "-" + index} className="record-card">
-              <div className="record-index">{String(index + 1).padStart(2, "0")}</div>
-              <div>
-                <h3>{record["钻孔编号"]} <span className="tag">{record["岩性分类"]}</span></h3>
-                <p>
-                  孔深{record["孔深"]}m · {record["岩性描述"]} · {record["土色"]} ·
-                  分层{record["分层深度"]}m · 标贯{record["标贯击数"]}击 · 水位{record["地下水位"]}m
-                </p>
+
+        <div className="panel layer-editor-panel">
+          <div className="section-heading">
+            <div>
+              <p>地层分层</p>
+              <h2>
+                {selectedBorehole ? `${selectedBorehole} · 分层编辑器` : "请选择钻孔"}
+                {selectedRecord && <span className="hole-depth-tag">孔深 {selectedRecord["孔深"]}m</span>}
+              </h2>
+            </div>
+          </div>
+
+          {selectedBorehole ? (
+            <div className="layer-editor-container">
+              <div className="stratum-column">
+                <div className="column-header">
+                  <span>深度(m)</span>
+                </div>
+                <div className="column-body">
+                  {sortedLayers.length > 0 ? (
+                    sortedLayers.map((layer, idx) => {
+                      const start = parseFloat(layer.startDepth);
+                      const end = parseFloat(layer.endDepth);
+                      const thickness = end - start;
+                      const topPercent = (start / holeDepth) * 100;
+                      const heightPercent = (thickness / holeDepth) * 100;
+                      const colorClass = `litho-${idx % 6}`;
+                      return (
+                        <div
+                          key={layer.id}
+                          className={`stratum-layer ${colorClass}`}
+                          style={{ top: `${topPercent}%`, height: `${heightPercent}%` }}
+                          onClick={() => handleEditLayer(layer)}
+                        >
+                          <span className="layer-depth-top">{layer.startDepth}</span>
+                          <span className="layer-name">{layer.lithology}</span>
+                          <span className="layer-depth-bottom">{layer.endDepth}</span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="column-empty">暂无分层数据</div>
+                  )}
+                  <div className="column-scale">
+                    {[0, 25, 50, 75, 100].map(pct => (
+                      <span key={pct} style={{ top: `${pct}%` }}>{((holeDepth * pct) / 100).toFixed(1)}</span>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </article>
-          ))}
+
+              <div className="layer-form-section">
+                <h3>{editingLayerId ? "编辑分层" : "新增分层"}</h3>
+                <div className="layer-form-grid">
+                  <label>
+                    <span>起始深度 (m)</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      className={layerErrors.startDepth ? "input-error" : ""}
+                      placeholder="起始深度"
+                      value={layerForm.startDepth}
+                      onChange={(e) => handleLayerInputChange("startDepth", e.target.value)}
+                    />
+                    {layerErrors.startDepth && <em className="error-tip">{layerErrors.startDepth}</em>}
+                  </label>
+                  <label>
+                    <span>终止深度 (m)</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      className={layerErrors.endDepth ? "input-error" : ""}
+                      placeholder="终止深度"
+                      value={layerForm.endDepth}
+                      onChange={(e) => handleLayerInputChange("endDepth", e.target.value)}
+                    />
+                    {layerErrors.endDepth && <em className="error-tip">{layerErrors.endDepth}</em>}
+                  </label>
+                  <label>
+                    <span>岩性</span>
+                    <select
+                      className={layerErrors.lithology ? "input-error" : ""}
+                      value={layerForm.lithology}
+                      onChange={(e) => handleLayerInputChange("lithology", e.target.value)}
+                    >
+                      <option value="">选择岩性</option>
+                      {lithologyOptions.map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                    {layerErrors.lithology && <em className="error-tip">{layerErrors.lithology}</em>}
+                  </label>
+                  <label>
+                    <span>土色</span>
+                    <select
+                      className={layerErrors.soilColor ? "input-error" : ""}
+                      value={layerForm.soilColor}
+                      onChange={(e) => handleLayerInputChange("soilColor", e.target.value)}
+                    >
+                      <option value="">选择土色</option>
+                      {soilColorOptions.map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                    {layerErrors.soilColor && <em className="error-tip">{layerErrors.soilColor}</em>}
+                  </label>
+                  <label>
+                    <span>密实度/状态</span>
+                    <select
+                      className={layerErrors.density ? "input-error" : ""}
+                      value={layerForm.density}
+                      onChange={(e) => handleLayerInputChange("density", e.target.value)}
+                    >
+                      <option value="">选择密实度/状态</option>
+                      {densityOptions.map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                    {layerErrors.density && <em className="error-tip">{layerErrors.density}</em>}
+                  </label>
+                  <label className="full-width">
+                    <span>描述</span>
+                    <input
+                      placeholder="分层描述"
+                      value={layerForm.description}
+                      onChange={(e) => handleLayerInputChange("description", e.target.value)}
+                    />
+                  </label>
+                </div>
+
+                {layerValidationMessage && (
+                  <div className="layer-validation-error">{layerValidationMessage}</div>
+                )}
+
+                {gapMessage && sortedLayers.length > 0 && (
+                  <div className="layer-gap-warning">{gapMessage}</div>
+                )}
+
+                <div className="layer-form-actions">
+                  {editingLayerId ? (
+                    <>
+                      <button className="secondary-btn" onClick={handleCancelEdit}>取消</button>
+                      <button className="primary-action" onClick={handleUpdateLayer}>更新分层</button>
+                    </>
+                  ) : (
+                    <button className="primary-action" onClick={handleAddLayer}>添加分层</button>
+                  )}
+                </div>
+
+                <div className="layer-list-section">
+                  <h4>分层列表</h4>
+                  <div className="layer-table-wrapper">
+                    <table className="layer-table">
+                      <thead>
+                        <tr>
+                          <th>序号</th>
+                          <th>深度范围(m)</th>
+                          <th>岩性</th>
+                          <th>土色</th>
+                          <th>密实度</th>
+                          <th>描述</th>
+                          <th>操作</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedLayers.map((layer, idx) => (
+                          <tr key={layer.id} className={editingLayerId === layer.id ? "editing-row" : ""}>
+                            <td>{idx + 1}</td>
+                            <td><strong>{layer.startDepth} ~ {layer.endDepth}</strong></td>
+                            <td><span className="tag">{layer.lithology}</span></td>
+                            <td>{layer.soilColor}</td>
+                            <td>{layer.density}</td>
+                            <td className="layer-desc-cell">{layer.description}</td>
+                            <td>
+                              <button className="small-btn" onClick={() => handleEditLayer(layer)}>编辑</button>
+                              <button className="small-btn danger-btn" onClick={() => handleDeleteLayer(layer.id)}>删除</button>
+                            </td>
+                          </tr>
+                        ))}
+                        {sortedLayers.length === 0 && (
+                          <tr>
+                            <td colSpan={7} className="empty-row">暂无分层数据，请添加</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="layer-editor-empty">
+              <p>请从左侧选择一个钻孔以查看和编辑地层分层</p>
+            </div>
+          )}
         </div>
       </section>
 
