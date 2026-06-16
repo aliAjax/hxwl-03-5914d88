@@ -332,9 +332,13 @@ function App() {
     if (layerErrors[field]) {
       setLayerErrors(prev => ({ ...prev, [field]: undefined }));
     }
+    if (layerValidationMessage) {
+      setLayerValidationMessage("");
+    }
   };
 
   const handleAddLayer = () => {
+    setLayerValidationMessage("");
     const { valid, errors: formErrors } = validateLayerForm();
     setLayerErrors(formErrors);
 
@@ -364,6 +368,7 @@ function App() {
   };
 
   const handleUpdateLayer = () => {
+    setLayerValidationMessage("");
     const { valid, errors: formErrors } = validateLayerForm();
     setLayerErrors(formErrors);
 
