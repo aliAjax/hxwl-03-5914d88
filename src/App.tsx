@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import "./styles.css";
 
 const project = {
@@ -149,6 +149,8 @@ function App() {
   const [records, setRecords] = useState<DrillingRecord[]>(initialRecords);
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   const filteredRecords = useMemo(() => {
     if (!activeFilter) return records;
@@ -173,6 +175,73 @@ function App() {
       avgWaterLevel.toFixed(1) + "m"
     ];
   }, [filteredRecords]);
+
+  const summaryStats = useMemo(() => {
+    const targetRecords = activeFilter ? filteredRecords : records;
+    const totalDepth = targetRecords.reduce((sum, r) => sum + (parseFloat(r["孔深"]) || 0), 0);
+    const recordCount = targetRecords.length;
+    const maxSPT = targetRecords.reduce((max, r) => {
+      const spt = parseFloat(r["标贯击数"]);
+      return isNaN(spt) ? max : Math.max(max, spt);
+    }, 0);
+    const minWaterLevel = targetRecords.length > 0
+      ? targetRecords.reduce((min, r) => {
+          const wl = parseFloat(r["地下水位"]);
+          return isNaN(wl) ? min : Math.min(min, wl);
+        }, parseFloat(targetRecords[0]["地下水位"]) || 0)
+      : 0;
+
+    return {
+      projectId: project.id,
+      recordCount,
+      totalDepth: totalDepth.toFixed(1) + "m",
+      maxSPT: String(maxSPT) + "击",
+      minWaterLevel: minWaterLevel.toFixed(1) + "m"
+    };
+  }, [records, filteredRecords, activeFilter]);
+
+  const generateTextSummary = useCallback(() => {
+    const { projectId, recordCount, totalDepth, maxSPT, minWaterLevel } = summaryStats;
+    const targetRecords = activeFilter ? filteredRecords : records;
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+    let text = `岩土钻孔摘要报告\n`;
+    text += `生成时间：${dateStr}\n`;
+    text += `────────────────────────────\n\n`;
+    text += `【项目概况】\n`;
+    text += `项目编号：${projectId}\n`;
+    text += `记录数量：${recordCount}条\n`;
+    text += `累计孔深：${totalDepth}\n`;
+    text += `最高标贯：${maxSPT}\n`;
+    text += `地下水位：${minWaterLevel}\n\n`;
+    text += `【近期记录】\n`;
+    text += `────────────────────────────\n`;
+    targetRecords.forEach((r, i) => {
+      text += `${String(i + 1).padStart(2, "0")}. ${r["钻孔编号"]} | 孔深${r["孔深"]}m | ${r["岩性分类"]} | ${r["岩性描述"]} | 标贯${r["标贯击数"]}击 | 水位${r["地下水位"]}m\n`;
+    });
+    text += `────────────────────────────\n`;
+
+    return text;
+  }, [summaryStats, activeFilter, filteredRecords, records]);
+
+  const handleCopySummary = useCallback(async () => {
+    const text = generateTextSummary();
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    }
+  }, [generateTextSummary]);
 
   const handleInputChange = (field: FieldName, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -318,7 +387,7 @@ function App() {
             <p>钻孔数据</p>
             <h2>近期记录{activeFilter ? ` · ${activeFilter}` : ""}</h2>
           </div>
-          <button>导出摘要</button>
+          <button onClick={() => setShowPreview(true)}>导出摘要</button>
         </div>
         <div className="record-list">
           {filteredRecords.map((record, index: number) => (
@@ -335,6 +404,91 @@ function App() {
           ))}
         </div>
       </section>
+
+      {showPreview && (
+        <div className="preview-overlay" onClick={() => setShowPreview(false)}>
+          <div className="preview-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="preview-header">
+              <div>
+                <p className="eyebrow">钻孔摘要预览</p>
+                <h2>项目摘要报告</h2>
+              </div>
+              <button className="close-btn" onClick={() => setShowPreview(false)}>×</button>
+            </div>
+
+            <div className="preview-content">
+              <div className="summary-cards">
+                <div className="summary-card">
+                  <span>项目编号</span>
+                  <strong>{summaryStats.projectId}</strong>
+                </div>
+                <div className="summary-card">
+                  <span>记录数量</span>
+                  <strong>{summaryStats.recordCount}条</strong>
+                </div>
+                <div className="summary-card">
+                  <span>累计孔深</span>
+                  <strong>{summaryStats.totalDepth}</strong>
+                </div>
+                <div className="summary-card">
+                  <span>最高标贯</span>
+                  <strong>{summaryStats.maxSPT}</strong>
+                </div>
+                <div className="summary-card">
+                  <span>地下水位</span>
+                  <strong>{summaryStats.minWaterLevel}</strong>
+                </div>
+              </div>
+
+              <div className="preview-section">
+                <h3>近期记录简表</h3>
+                <div className="summary-table-wrapper">
+                  <table className="summary-table">
+                    <thead>
+                      <tr>
+                        <th>序号</th>
+                        <th>钻孔编号</th>
+                        <th>孔深(m)</th>
+                        <th>岩性分类</th>
+                        <th>岩性描述</th>
+                        <th>标贯击数</th>
+                        <th>地下水位(m)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(activeFilter ? filteredRecords : records).map((record: DrillingRecord, index: number) => (
+                        <tr key={record["钻孔编号"] + "-" + index}>
+                          <td>{String(index + 1).padStart(2, "0")}</td>
+                          <td><strong>{record["钻孔编号"]}</strong></td>
+                          <td>{record["孔深"]}</td>
+                          <td><span className="tag">{record["岩性分类"]}</span></td>
+                          <td>{record["岩性描述"]}</td>
+                          <td>{record["标贯击数"]}</td>
+                          <td>{record["地下水位"]}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="preview-section">
+                <h3>文本摘要</h3>
+                <div className="text-summary">
+                  <pre>{generateTextSummary()}</pre>
+                </div>
+              </div>
+            </div>
+
+            <div className="preview-footer">
+              <button className="secondary-btn" onClick={() => setShowPreview(false)}>关闭</button>
+              <button className="primary-action" onClick={handleCopySummary}>
+                {copySuccess ? "✓ 已复制到剪贴板" : "复制文本摘要"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
