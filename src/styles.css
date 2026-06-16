@@ -223,6 +223,18 @@ input {
   color: #172033;
 }
 
+.input-error {
+  border-color: #e11d48;
+  background: #fff1f2;
+}
+
+.error-tip {
+  color: #e11d48;
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.4;
+}
+
 .record-list {
   display: grid;
   gap: 12px;
