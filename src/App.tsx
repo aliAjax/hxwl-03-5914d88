@@ -15,6 +15,19 @@ interface BoreholeLayers {
   [boreholeId: string]: StratumLayer[];
 }
 
+interface SPTRecord {
+  id: string;
+  depth: string;
+  blowCount: string;
+  isAbnormal: boolean;
+  remark: string;
+  layerId: string;
+}
+
+interface BoreholeSPTRecords {
+  [boreholeId: string]: SPTRecord[];
+}
+
 const lithologyOptions = ["黏土", "粉质黏土", "粉土", "粉砂", "细砂", "中砂", "粗砂", "卵石", "圆砾", "强风化岩", "中风化岩", "微风化岩"];
 const soilColorOptions = ["褐黄色", "黄褐色", "灰黄色", "灰白色", "灰色", "灰褐色", "紫红色", "杂色"];
 const densityOptions = ["松散", "稍密", "中密", "密实", "可塑", "硬塑", "坚硬", "流塑"];
@@ -23,26 +36,59 @@ const generateId = () => Math.random().toString(36).slice(2, 11);
 
 const initialLayers: BoreholeLayers = {
   "ZK-18": [
-    { id: generateId(), startDepth: "0", endDepth: "3.2", lithology: "粉质黏土", soilColor: "褐黄色", density: "可塑", description: "含少量铁锰氧化物斑点，稍有光泽" },
-    { id: generateId(), startDepth: "3.2", endDepth: "8.5", lithology: "粉土", soilColor: "灰黄色", density: "中密", description: "夹薄层粉砂，摇振反应中等" },
-    { id: generateId(), startDepth: "8.5", endDepth: "15.8", lithology: "粉砂", soilColor: "灰白色", density: "密实", description: "矿物成分以石英、长石为主" },
-    { id: generateId(), startDepth: "15.8", endDepth: "22.6", lithology: "卵石", soilColor: "杂色", density: "中密", description: "磨圆度较好，充填中粗砂" },
+    { id: "layer-zk18-1", startDepth: "0", endDepth: "3.2", lithology: "粉质黏土", soilColor: "褐黄色", density: "可塑", description: "含少量铁锰氧化物斑点，稍有光泽" },
+    { id: "layer-zk18-2", startDepth: "3.2", endDepth: "8.5", lithology: "粉土", soilColor: "灰黄色", density: "中密", description: "夹薄层粉砂，摇振反应中等" },
+    { id: "layer-zk18-3", startDepth: "8.5", endDepth: "15.8", lithology: "粉砂", soilColor: "灰白色", density: "密实", description: "矿物成分以石英、长石为主" },
+    { id: "layer-zk18-4", startDepth: "15.8", endDepth: "22.6", lithology: "卵石", soilColor: "杂色", density: "中密", description: "磨圆度较好，充填中粗砂" },
   ],
   "ZK-21": [
-    { id: generateId(), startDepth: "0", endDepth: "2.5", lithology: "粉质黏土", soilColor: "褐黄色", density: "硬塑", description: "表层为耕植土，含植物根系" },
-    { id: generateId(), startDepth: "2.5", endDepth: "12.0", lithology: "圆砾", soilColor: "灰白色", density: "稍密", description: "颗粒级配一般，充填砂粒" },
-    { id: generateId(), startDepth: "12.0", endDepth: "25.5", lithology: "卵石", soilColor: "杂色", density: "中密", description: "岩性以砂岩、灰岩为主" },
-    { id: generateId(), startDepth: "25.5", endDepth: "31.2", lithology: "强风化岩", soilColor: "紫红色", density: "坚硬", description: "岩芯破碎，呈碎块状" },
+    { id: "layer-zk21-1", startDepth: "0", endDepth: "2.5", lithology: "粉质黏土", soilColor: "褐黄色", density: "硬塑", description: "表层为耕植土，含植物根系" },
+    { id: "layer-zk21-2", startDepth: "2.5", endDepth: "12.0", lithology: "圆砾", soilColor: "灰白色", density: "稍密", description: "颗粒级配一般，充填砂粒" },
+    { id: "layer-zk21-3", startDepth: "12.0", endDepth: "25.5", lithology: "卵石", soilColor: "杂色", density: "中密", description: "岩性以砂岩、灰岩为主" },
+    { id: "layer-zk21-4", startDepth: "25.5", endDepth: "31.2", lithology: "强风化岩", soilColor: "紫红色", density: "坚硬", description: "岩芯破碎，呈碎块状" },
   ],
   "ZK-24": [
-    { id: generateId(), startDepth: "0", endDepth: "4.8", lithology: "黏土", soilColor: "褐黄色", density: "可塑", description: "含铁锰结核，干强度高" },
-    { id: generateId(), startDepth: "4.8", endDepth: "10.2", lithology: "粉砂", soilColor: "灰黄色", density: "中密", description: "饱和状态，矿物成分石英为主" },
-    { id: generateId(), startDepth: "10.2", endDepth: "18.4", lithology: "强风化岩", soilColor: "紫红色", density: "坚硬", description: "泥岩，岩芯较破碎" },
+    { id: "layer-zk24-1", startDepth: "0", endDepth: "4.8", lithology: "黏土", soilColor: "褐黄色", density: "可塑", description: "含铁锰结核，干强度高" },
+    { id: "layer-zk24-2", startDepth: "4.8", endDepth: "10.2", lithology: "粉砂", soilColor: "灰黄色", density: "中密", description: "饱和状态，矿物成分石英为主" },
+    { id: "layer-zk24-3", startDepth: "10.2", endDepth: "18.4", lithology: "强风化岩", soilColor: "紫红色", density: "坚硬", description: "泥岩，岩芯较破碎" },
   ],
   "ZK-27": [
-    { id: generateId(), startDepth: "0", endDepth: "1.8", lithology: "粉质黏土", soilColor: "褐黄色", density: "可塑", description: "含少量粉砂，稍有光泽" },
-    { id: generateId(), startDepth: "1.8", endDepth: "7.5", lithology: "粉砂", soilColor: "灰白色", density: "稍密", description: "颗粒均匀，级配不良" },
-    { id: generateId(), startDepth: "7.5", endDepth: "15.8", lithology: "细砂", soilColor: "灰黄色", density: "中密", description: "夹粉土薄层，饱和" },
+    { id: "layer-zk27-1", startDepth: "0", endDepth: "1.8", lithology: "粉质黏土", soilColor: "褐黄色", density: "可塑", description: "含少量粉砂，稍有光泽" },
+    { id: "layer-zk27-2", startDepth: "1.8", endDepth: "7.5", lithology: "粉砂", soilColor: "灰白色", density: "稍密", description: "颗粒均匀，级配不良" },
+    { id: "layer-zk27-3", startDepth: "7.5", endDepth: "15.8", lithology: "细砂", soilColor: "灰黄色", density: "中密", description: "夹粉土薄层，饱和" },
+  ],
+};
+
+const initialSPTRecords: BoreholeSPTRecords = {
+  "ZK-18": [
+    { id: "spt-zk18-1", depth: "1.5", blowCount: "8", isAbnormal: false, remark: "", layerId: "layer-zk18-1" },
+    { id: "spt-zk18-2", depth: "2.5", blowCount: "12", isAbnormal: false, remark: "", layerId: "layer-zk18-1" },
+    { id: "spt-zk18-3", depth: "5.0", blowCount: "18", isAbnormal: false, remark: "", layerId: "layer-zk18-2" },
+    { id: "spt-zk18-4", depth: "7.0", blowCount: "15", isAbnormal: true, remark: "遇孤石", layerId: "layer-zk18-2" },
+    { id: "spt-zk18-5", depth: "10.0", blowCount: "32", isAbnormal: false, remark: "", layerId: "layer-zk18-3" },
+    { id: "spt-zk18-6", depth: "13.0", blowCount: "45", isAbnormal: false, remark: "", layerId: "layer-zk18-3" },
+    { id: "spt-zk18-7", depth: "18.0", blowCount: "50", isAbnormal: false, remark: "", layerId: "layer-zk18-4" },
+  ],
+  "ZK-21": [
+    { id: "spt-zk21-1", depth: "1.0", blowCount: "14", isAbnormal: false, remark: "", layerId: "layer-zk21-1" },
+    { id: "spt-zk21-2", depth: "5.0", blowCount: "22", isAbnormal: false, remark: "", layerId: "layer-zk21-2" },
+    { id: "spt-zk21-3", depth: "8.0", blowCount: "28", isAbnormal: false, remark: "", layerId: "layer-zk21-2" },
+    { id: "spt-zk21-4", depth: "15.0", blowCount: "42", isAbnormal: false, remark: "", layerId: "layer-zk21-3" },
+    { id: "spt-zk21-5", depth: "20.0", blowCount: "50", isAbnormal: false, remark: "击数超限", layerId: "layer-zk21-3" },
+  ],
+  "ZK-24": [
+    { id: "spt-zk24-1", depth: "2.0", blowCount: "10", isAbnormal: false, remark: "", layerId: "layer-zk24-1" },
+    { id: "spt-zk24-2", depth: "4.0", blowCount: "9", isAbnormal: false, remark: "", layerId: "layer-zk24-1" },
+    { id: "spt-zk24-3", depth: "7.0", blowCount: "25", isAbnormal: false, remark: "", layerId: "layer-zk24-2" },
+    { id: "spt-zk24-4", depth: "12.0", blowCount: "50", isAbnormal: false, remark: "", layerId: "layer-zk24-3" },
+    { id: "spt-zk24-5", depth: "15.0", blowCount: "50", isAbnormal: true, remark: "岩芯破碎", layerId: "layer-zk24-3" },
+  ],
+  "ZK-27": [
+    { id: "spt-zk27-1", depth: "1.0", blowCount: "6", isAbnormal: false, remark: "", layerId: "layer-zk27-1" },
+    { id: "spt-zk27-2", depth: "3.5", blowCount: "12", isAbnormal: false, remark: "", layerId: "layer-zk27-2" },
+    { id: "spt-zk27-3", depth: "5.5", blowCount: "15", isAbnormal: false, remark: "", layerId: "layer-zk27-2" },
+    { id: "spt-zk27-4", depth: "10.0", blowCount: "22", isAbnormal: false, remark: "", layerId: "layer-zk27-3" },
+    { id: "spt-zk27-5", depth: "13.0", blowCount: "28", isAbnormal: false, remark: "", layerId: "layer-zk27-3" },
   ],
 };
 
@@ -198,6 +244,13 @@ const emptyLayerForm: Omit<StratumLayer, "id"> = {
   description: ""
 };
 
+const emptySPTForm: Omit<SPTRecord, "id" | "layerId"> = {
+  depth: "",
+  blowCount: "",
+  isAbnormal: false,
+  remark: ""
+};
+
 function App() {
   const [formData, setFormData] = useState<DrillingRecord>(emptyForm);
   const [records, setRecords] = useState<DrillingRecord[]>(initialRecords);
@@ -213,6 +266,12 @@ function App() {
   const [layerErrors, setLayerErrors] = useState<Partial<Record<keyof StratumLayer, string>>>({});
   const [layerValidationMessage, setLayerValidationMessage] = useState<string>("");
   const [gapMessage, setGapMessage] = useState<string>("");
+
+  const [sptRecords, setSPTRecords] = useState<BoreholeSPTRecords>(initialSPTRecords);
+  const [sptForm, setSPTForm] = useState<Omit<SPTRecord, "id" | "layerId">>(emptySPTForm);
+  const [editingSPTId, setEditingSPTId] = useState<string | null>(null);
+  const [sptErrors, setSPTErrors] = useState<Partial<Record<keyof SPTRecord, string>>>({});
+  const [sptValidationMessage, setSPTValidationMessage] = useState<string>("");
 
   const currentLayers = useMemo(() => {
     if (!selectedBorehole) return [];
@@ -232,6 +291,58 @@ function App() {
   const sortedLayers = useMemo(() => {
     return [...currentLayers].sort((a, b) => parseFloat(a.startDepth) - parseFloat(b.startDepth));
   }, [currentLayers]);
+
+  const currentSPTRecords = useMemo(() => {
+    if (!selectedBorehole) return [];
+    return sptRecords[selectedBorehole] || [];
+  }, [sptRecords, selectedBorehole]);
+
+  const sortedSPTRecords = useMemo(() => {
+    return [...currentSPTRecords].sort((a, b) => parseFloat(a.depth) - parseFloat(b.depth));
+  }, [currentSPTRecords]);
+
+  const findLayerByDepth = useCallback((depth: number): StratumLayer | null => {
+    for (const layer of sortedLayers) {
+      const start = parseFloat(layer.startDepth);
+      const end = parseFloat(layer.endDepth);
+      if (depth >= start && depth <= end) {
+        return layer;
+      }
+    }
+    return null;
+  }, [sortedLayers]);
+
+  const sptStats = useMemo(() => {
+    const records = sortedSPTRecords;
+    if (records.length === 0) {
+      return { maxBlow: 0, abnormalCount: 0, totalCount: 0, maxBlowLithology: "-" };
+    }
+
+    let maxBlow = 0;
+    let maxBlowLayerId = "";
+    let abnormalCount = 0;
+
+    for (const record of records) {
+      const blow = parseFloat(record.blowCount);
+      if (!isNaN(blow) && blow > maxBlow) {
+        maxBlow = blow;
+        maxBlowLayerId = record.layerId;
+      }
+      if (record.isAbnormal) {
+        abnormalCount++;
+      }
+    }
+
+    const maxBlowLayer = sortedLayers.find(l => l.id === maxBlowLayerId);
+    const maxBlowLithology = maxBlowLayer ? maxBlowLayer.lithology : "-";
+
+    return {
+      maxBlow,
+      abnormalCount,
+      totalCount: records.length,
+      maxBlowLithology
+    };
+  }, [sortedSPTRecords, sortedLayers]);
 
   const validateLayerForm = useCallback((): { valid: boolean; errors: Partial<Record<keyof StratumLayer, string>> } => {
     const errs: Partial<Record<keyof StratumLayer, string>> = {};
@@ -429,12 +540,168 @@ function App() {
     setLayerValidationMessage("");
   };
 
+  const validateSPTForm = useCallback((): { valid: boolean; errors: Partial<Record<keyof SPTRecord, string>> } => {
+    const errs: Partial<Record<keyof SPTRecord, string>> = {};
+
+    if (!sptForm.depth.trim()) {
+      errs.depth = "深度不能为空";
+    } else if (isNaN(parseFloat(sptForm.depth)) || parseFloat(sptForm.depth) < 0) {
+      errs.depth = "深度必须为非负数";
+    }
+
+    if (!sptForm.blowCount.trim()) {
+      errs.blowCount = "击数不能为空";
+    } else if (isNaN(parseFloat(sptForm.blowCount)) || parseFloat(sptForm.blowCount) < 0) {
+      errs.blowCount = "击数必须为非负数";
+    }
+
+    return { valid: Object.keys(errs).length === 0, errors: errs };
+  }, [sptForm]);
+
+  const checkDepthInLayers = useCallback((): { valid: boolean; message: string; layer: StratumLayer | null } => {
+    const depth = parseFloat(sptForm.depth);
+    if (isNaN(depth)) return { valid: false, message: "", layer: null };
+
+    if (sortedLayers.length === 0) {
+      return { valid: false, message: "当前钻孔暂无地层分层数据，请先添加分层", layer: null };
+    }
+
+    const layer = findLayerByDepth(depth);
+
+    if (!layer) {
+      const minDepth = parseFloat(sortedLayers[0].startDepth);
+      const maxDepth = parseFloat(sortedLayers[sortedLayers.length - 1].endDepth);
+
+      if (depth < minDepth) {
+        return { valid: false, message: `深度 ${depth}m 位于地层之上（最浅分层起始于 ${minDepth}m），请检查深度是否正确`, layer: null };
+      } else if (depth > maxDepth) {
+        return { valid: false, message: `深度 ${depth}m 超出最深分层（最深分层终止于 ${maxDepth}m），请检查深度是否正确`, layer: null };
+      } else {
+        return { valid: false, message: `深度 ${depth}m 落在分层缺口处，请先补全该深度范围的分层`, layer: null };
+      }
+    }
+
+    return { valid: true, message: "", layer };
+  }, [sptForm.depth, sortedLayers, findLayerByDepth]);
+
+  const handleSPTInputChange = (field: keyof Omit<SPTRecord, "id" | "layerId">, value: string | boolean) => {
+    setSPTForm(prev => ({ ...prev, [field]: value }));
+    if (sptErrors[field]) {
+      setSPTErrors(prev => ({ ...prev, [field]: undefined }));
+    }
+    if (sptValidationMessage) {
+      setSPTValidationMessage("");
+    }
+  };
+
+  const handleAddSPTRecord = () => {
+    setSPTValidationMessage("");
+    const { valid, errors: formErrors } = validateSPTForm();
+    setSPTErrors(formErrors);
+
+    if (!valid) return;
+
+    const { valid: depthValid, message, layer } = checkDepthInLayers();
+    if (!depthValid) {
+      setSPTValidationMessage(message);
+      return;
+    }
+
+    if (!selectedBorehole || !layer) return;
+
+    const newRecord: SPTRecord = {
+      ...sptForm,
+      id: generateId(),
+      layerId: layer.id
+    };
+
+    setSPTRecords(prev => {
+      const existing = prev[selectedBorehole] || [];
+      return { ...prev, [selectedBorehole]: [...existing, newRecord] };
+    });
+
+    setSPTForm(emptySPTForm);
+    setSPTErrors({});
+    setSPTValidationMessage("");
+  };
+
+  const handleUpdateSPTRecord = () => {
+    setSPTValidationMessage("");
+    const { valid, errors: formErrors } = validateSPTForm();
+    setSPTErrors(formErrors);
+
+    if (!valid || !editingSPTId || !selectedBorehole) return;
+
+    const { valid: depthValid, message, layer } = checkDepthInLayers();
+    if (!depthValid) {
+      setSPTValidationMessage(message);
+      return;
+    }
+
+    if (!layer) return;
+
+    setSPTRecords(prev => {
+      const existing = prev[selectedBorehole] || [];
+      return {
+        ...prev,
+        [selectedBorehole]: existing.map(r =>
+          r.id === editingSPTId ? { ...sptForm, id: editingSPTId, layerId: layer.id } : r
+        )
+      };
+    });
+
+    setSPTForm(emptySPTForm);
+    setEditingSPTId(null);
+    setSPTErrors({});
+    setSPTValidationMessage("");
+  };
+
+  const handleEditSPTRecord = (record: SPTRecord) => {
+    setSPTForm({
+      depth: record.depth,
+      blowCount: record.blowCount,
+      isAbnormal: record.isAbnormal,
+      remark: record.remark
+    });
+    setEditingSPTId(record.id);
+    setSPTErrors({});
+    setSPTValidationMessage("");
+  };
+
+  const handleDeleteSPTRecord = (recordId: string) => {
+    if (!selectedBorehole) return;
+    setSPTRecords(prev => {
+      const existing = prev[selectedBorehole] || [];
+      return { ...prev, [selectedBorehole]: existing.filter(r => r.id !== recordId) };
+    });
+    if (editingSPTId === recordId) {
+      setSPTForm(emptySPTForm);
+      setEditingSPTId(null);
+    }
+  };
+
+  const handleCancelSPTEdit = () => {
+    setSPTForm(emptySPTForm);
+    setEditingSPTId(null);
+    setSPTErrors({});
+    setSPTValidationMessage("");
+  };
+
+  const getLayerLithology = (layerId: string): string => {
+    const layer = sortedLayers.find(l => l.id === layerId);
+    return layer ? layer.lithology : "-";
+  };
+
   const handleSelectBorehole = (boreholeId: string) => {
     setSelectedBorehole(boreholeId);
     setLayerForm(emptyLayerForm);
     setEditingLayerId(null);
     setLayerErrors({});
     setLayerValidationMessage("");
+    setSPTForm(emptySPTForm);
+    setEditingSPTId(null);
+    setSPTErrors({});
+    setSPTValidationMessage("");
   };
 
   useEffect(() => {
@@ -471,10 +738,16 @@ function App() {
   const metrics = useMemo(() => {
     const totalDepth = filteredRecords.reduce((sum, r) => sum + (parseFloat(r["孔深"]) || 0), 0);
     const layerCount = filteredRecords.length;
-    const maxSPT = filteredRecords.reduce((max, r) => {
-      const spt = parseFloat(r["标贯击数"]);
-      return isNaN(spt) ? max : Math.max(max, spt);
-    }, 0);
+    let maxSPT = 0;
+    filteredRecords.forEach(r => {
+      const boreholeSPT = sptRecords[r["钻孔编号"]] || [];
+      boreholeSPT.forEach(spt => {
+        const blow = parseFloat(spt.blowCount);
+        if (!isNaN(blow) && blow > maxSPT) {
+          maxSPT = blow;
+        }
+      });
+    });
     const avgWaterLevel = filteredRecords.length > 0
       ? filteredRecords.reduce((sum, r) => sum + (parseFloat(r["地下水位"]) || 0), 0) / filteredRecords.length
       : 0;
@@ -485,16 +758,22 @@ function App() {
       String(maxSPT) + "击",
       avgWaterLevel.toFixed(1) + "m"
     ];
-  }, [filteredRecords]);
+  }, [filteredRecords, sptRecords]);
 
   const summaryStats = useMemo(() => {
     const targetRecords = activeFilter ? filteredRecords : records;
     const totalDepth = targetRecords.reduce((sum, r) => sum + (parseFloat(r["孔深"]) || 0), 0);
     const recordCount = targetRecords.length;
-    const maxSPT = targetRecords.reduce((max, r) => {
-      const spt = parseFloat(r["标贯击数"]);
-      return isNaN(spt) ? max : Math.max(max, spt);
-    }, 0);
+    let maxSPT = 0;
+    targetRecords.forEach(r => {
+      const boreholeSPT = sptRecords[r["钻孔编号"]] || [];
+      boreholeSPT.forEach(spt => {
+        const blow = parseFloat(spt.blowCount);
+        if (!isNaN(blow) && blow > maxSPT) {
+          maxSPT = blow;
+        }
+      });
+    });
     const minWaterLevel = targetRecords.length > 0
       ? targetRecords.reduce((min, r) => {
           const wl = parseFloat(r["地下水位"]);
@@ -509,7 +788,7 @@ function App() {
       maxSPT: String(maxSPT) + "击",
       minWaterLevel: minWaterLevel.toFixed(1) + "m"
     };
-  }, [records, filteredRecords, activeFilter]);
+  }, [records, filteredRecords, activeFilter, sptRecords]);
 
   const generateTextSummary = useCallback(() => {
     const { projectId, recordCount, totalDepth, maxSPT, minWaterLevel } = summaryStats;
@@ -767,6 +1046,20 @@ function App() {
                       <span key={pct} style={{ top: `${pct}%` }}>{((holeDepth * pct) / 100).toFixed(1)}</span>
                     ))}
                   </div>
+                  {sortedSPTRecords.map(record => {
+                    const depth = parseFloat(record.depth);
+                    const topPercent = holeDepth > 0 ? (depth / holeDepth) * 100 : 0;
+                    return (
+                      <div
+                        key={record.id}
+                        className={`spt-marker ${record.isAbnormal ? "spt-abnormal" : ""}`}
+                        style={{ top: `${topPercent}%` }}
+                        title={`深度${record.depth}m · ${record.blowCount}击${record.isAbnormal ? " · 异常" : ""}${record.remark ? " · " + record.remark : ""}`}
+                      >
+                        <span>{record.blowCount}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -905,6 +1198,140 @@ function App() {
                         )}
                       </tbody>
                     </table>
+                  </div>
+                </div>
+
+                <div className="spt-section">
+                  <div className="spt-stats">
+                    <div className="spt-stat-card">
+                      <span>最高标贯</span>
+                      <strong>{sptStats.maxBlow}击</strong>
+                      <em>{sptStats.maxBlowLithology}</em>
+                    </div>
+                    <div className="spt-stat-card">
+                      <span>记录总数</span>
+                      <strong>{sptStats.totalCount}次</strong>
+                      <em>有效试验</em>
+                    </div>
+                    <div className="spt-stat-card">
+                      <span>异常点数</span>
+                      <strong className={sptStats.abnormalCount > 0 ? "abnormal-count" : ""}>{sptStats.abnormalCount}个</strong>
+                      <em>需复核</em>
+                    </div>
+                  </div>
+
+                  <div className="spt-form-section">
+                    <h4>{editingSPTId ? "编辑标贯记录" : "新增标贯记录"}</h4>
+                    <div className="spt-form-grid">
+                      <label>
+                        <span>试验深度 (m)</span>
+                        <input
+                          type="number"
+                          step="0.1"
+                          className={sptErrors.depth ? "input-error" : ""}
+                          placeholder="标贯试验深度"
+                          value={sptForm.depth}
+                          onChange={(e) => handleSPTInputChange("depth", e.target.value)}
+                        />
+                        {sptErrors.depth && <em className="error-tip">{sptErrors.depth}</em>}
+                      </label>
+                      <label>
+                        <span>标贯击数</span>
+                        <input
+                          type="number"
+                          step="1"
+                          className={sptErrors.blowCount ? "input-error" : ""}
+                          placeholder="击数"
+                          value={sptForm.blowCount}
+                          onChange={(e) => handleSPTInputChange("blowCount", e.target.value)}
+                        />
+                        {sptErrors.blowCount && <em className="error-tip">{sptErrors.blowCount}</em>}
+                      </label>
+                      <label className="checkbox-label">
+                        <span>是否异常</span>
+                        <div className="checkbox-wrapper">
+                          <input
+                            type="checkbox"
+                            checked={sptForm.isAbnormal}
+                            onChange={(e) => handleSPTInputChange("isAbnormal", e.target.checked)}
+                          />
+                          <span className="checkbox-text">{sptForm.isAbnormal ? "是（需复核）" : "否（正常）"}</span>
+                        </div>
+                      </label>
+                      <label className="full-width">
+                        <span>备注</span>
+                        <input
+                          placeholder="异常原因或其他说明"
+                          value={sptForm.remark}
+                          onChange={(e) => handleSPTInputChange("remark", e.target.value)}
+                        />
+                      </label>
+                    </div>
+
+                    {sptValidationMessage && (
+                      <div className="spt-validation-error">{sptValidationMessage}</div>
+                    )}
+
+                    <div className="spt-form-actions">
+                      {editingSPTId ? (
+                        <>
+                          <button className="secondary-btn" onClick={handleCancelSPTEdit}>取消</button>
+                          <button className="primary-action" onClick={handleUpdateSPTRecord}>更新记录</button>
+                        </>
+                      ) : (
+                        <button className="primary-action" onClick={handleAddSPTRecord}>添加标贯记录</button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="spt-list-section">
+                    <h4>标贯记录列表</h4>
+                    <div className="spt-table-wrapper">
+                      <table className="spt-table">
+                        <thead>
+                          <tr>
+                            <th>序号</th>
+                            <th>深度(m)</th>
+                            <th>击数</th>
+                            <th>岩性</th>
+                            <th>状态</th>
+                            <th>备注</th>
+                            <th>操作</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sortedSPTRecords.map((record, idx) => (
+                            <tr key={record.id} className={editingSPTId === record.id ? "editing-row" : ""}>
+                              <td>{idx + 1}</td>
+                              <td><strong>{record.depth}</strong></td>
+                              <td>
+                                <span className={`blow-count ${record.isAbnormal ? "blow-abnormal" : ""}`}>
+                                  {record.blowCount}
+                                </span>
+                              </td>
+                              <td><span className="tag">{getLayerLithology(record.layerId)}</span></td>
+                              <td>
+                                {record.isAbnormal ? (
+                                  <span className="status-badge status-abnormal">异常</span>
+                                ) : (
+                                  <span className="status-badge status-normal">正常</span>
+                                )}
+                              </td>
+                              <td className="spt-remark-cell">{record.remark || "-"}</td>
+                              <td>
+                                <button className="small-btn" onClick={() => handleEditSPTRecord(record)}>编辑</button>
+                                <button className="small-btn danger-btn" onClick={() => handleDeleteSPTRecord(record.id)}>删除</button>
+                              </td>
+                            </tr>
+                          ))}
+                          {sortedSPTRecords.length === 0 && (
+                            <tr>
+                              <td colSpan={7} className="empty-row">暂无标贯记录，请添加</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               </div>

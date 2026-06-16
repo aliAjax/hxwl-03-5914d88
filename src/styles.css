@@ -869,3 +869,248 @@ input {
     grid-template-columns: 1fr;
   }
 }
+
+.spt-marker {
+  position: absolute;
+  left: 6px;
+  right: 46px;
+  height: 22px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.spt-marker span {
+  display: inline-block;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(15, 118, 110, 0.4);
+  line-height: 1.4;
+}
+
+.spt-marker.spt-abnormal span {
+  background: #e11d48;
+  box-shadow: 0 2px 6px rgba(225, 29, 72, 0.4);
+}
+
+.spt-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.spt-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.spt-stat-card {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+
+.spt-stat-card span {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.spt-stat-card strong {
+  display: block;
+  font-size: 22px;
+  color: #172033;
+  margin-bottom: 2px;
+}
+
+.spt-stat-card strong.abnormal-count {
+  color: #e11d48;
+}
+
+.spt-stat-card em {
+  font-style: normal;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.spt-form-section h4,
+.spt-list-section h4 {
+  font-size: 15px;
+  margin-bottom: 12px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.spt-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.spt-form-grid label {
+  display: grid;
+  gap: 6px;
+}
+
+.spt-form-grid label span {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.spt-form-grid label.full-width {
+  grid-column: 1 / -1;
+}
+
+.spt-form-grid label.checkbox-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 4px;
+}
+
+.checkbox-wrapper input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-height: auto;
+  cursor: pointer;
+}
+
+.checkbox-text {
+  font-size: 13px;
+  color: #334155;
+}
+
+.spt-validation-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.spt-form-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.spt-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.spt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.spt-table th {
+  background: #f8fafc;
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #475569;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.spt-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  color: #334155;
+  vertical-align: middle;
+}
+
+.spt-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.spt-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.spt-table tbody tr.editing-row {
+  background: color-mix(in srgb, var(--accent) 6%, #ffffff);
+}
+
+.blow-count {
+  display: inline-block;
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 14px;
+}
+
+.blow-count.blow-abnormal {
+  color: #e11d48;
+  text-decoration: line-through;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.status-badge.status-normal {
+  background: color-mix(in srgb, var(--accent) 12%, #ffffff);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, #dbe3ef);
+}
+
+.status-badge.status-abnormal {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.spt-remark-cell {
+  max-width: 180px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+@media (max-width: 960px) {
+  .spt-stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .spt-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .spt-stats {
+    grid-template-columns: 1fr;
+  }
+}
