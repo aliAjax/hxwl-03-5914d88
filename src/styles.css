@@ -592,6 +592,44 @@ input {
   font-size: 13px;
 }
 
+.borehole-item {
+  grid-template-columns: 48px 1fr auto;
+}
+
+.borehole-item.borehole-editing {
+  border-color: #2563eb;
+  background: color-mix(in srgb, #2563eb 5%, #ffffff);
+}
+
+.borehole-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.action-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.action-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 5%, #ffffff);
+}
+
+.action-btn.action-delete:hover:not(:disabled) {
+  border-color: #dc2626;
+  color: #dc2626;
+  background: color-mix(in srgb, #dc2626 5%, #ffffff);
+}
+
 .hole-depth-tag {
   display: inline-block;
   font-size: 13px;
@@ -2037,6 +2075,34 @@ button:disabled:hover {
   font-size: 11px;
   font-weight: 600;
   vertical-align: middle;
+}
+
+.check-hint {
+  display: inline-block;
+  margin-left: 8px;
+  color: #7c3aed;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.check-tip {
+  display: block;
+  margin-top: 4px;
+  color: #7c3aed;
+  font-size: 11px;
+  font-style: normal !important;
+}
+
+.input-readonly {
+  background: #f1f5f9 !important;
+  color: #64748b !important;
+  cursor: not-allowed !important;
+}
+
+.input-readonly:focus {
+  outline: none !important;
+  border-color: var(--border) !important;
+  box-shadow: none !important;
 }
 
 .layer-readonly {

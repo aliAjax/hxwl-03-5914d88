@@ -244,10 +244,12 @@ const emptyWaterLevelForm: Omit<WaterLevelRecord, "id"> = {
 function App() {
   const [currentRole, setCurrentRole] = useState<Role>("现场编录员");
   const permissions = useMemo(() => rolePermissions[currentRole], [currentRole]);
+  const isCheckMode = useMemo(() => currentRole === "岩土工程师", [currentRole]);
 
   const [formData, setFormData] = useState<DrillingRecord>(emptyForm);
   const [records, setRecords] = useState<DrillingRecord[]>([]);
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
@@ -942,6 +944,112 @@ function App() {
     setFormData(emptyForm); setErrors({});
   };
 
+  const handleEditRecord = (record: DrillingRecord) => {
+    setFormData({ ...record });
+    setEditingRecordId(record["钻孔编号"]);
+    setErrors({});
+  };
+
+  const handleCancelEditRecord = () => {
+    setFormData(emptyForm);
+    setEditingRecordId(null);
+    setErrors({});
+  };
+
+  const validateUpdate = (): boolean => {
+    const newErrors: Partial<Record<FieldName, string>> = {};
+    project.fields.forEach(field => {
+      if (!formData[field].trim()) newErrors[field] = `${field}不能为空`;
+    });
+    const hd = parseFloat(formData["孔深"]);
+    if (formData["孔深"].trim() && (isNaN(hd) || hd < 0)) newErrors["孔深"] = "孔深不能为负数";
+    const wl = parseFloat(formData["地下水位"]);
+    if (formData["地下水位"].trim() && !isNaN(wl) && wl < 0) newErrors["地下水位"] = "地下水位不能为负数";
+    if (formData["钻孔编号"].trim() && editingRecordId && formData["钻孔编号"].trim() !== editingRecordId && records.some(r => r["钻孔编号"] === formData["钻孔编号"].trim())) {
+      newErrors["钻孔编号"] = "钻孔编号已存在";
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleUpdateRecord = () => {
+    if (!validateUpdate() || !editingRecordId) return;
+    const oldBoreholeId = editingRecordId;
+    const newBoreholeId = formData["钻孔编号"].trim();
+    const trimmedRecord: DrillingRecord = {
+      "钻孔编号": newBoreholeId, "孔深": formData["孔深"].trim(), "岩性分类": formData["岩性分类"].trim(),
+      "岩性描述": formData["岩性描述"].trim(), "土色": formData["土色"].trim(), "地下水位": formData["地下水位"].trim()
+    };
+
+    if (oldBoreholeId !== newBoreholeId) {
+      setBoreholeLayers(prev => {
+        const next = { ...prev };
+        next[newBoreholeId] = prev[oldBoreholeId] || [];
+        delete next[oldBoreholeId];
+        return next;
+      });
+      setSPTRecords(prev => {
+        const next = { ...prev };
+        next[newBoreholeId] = prev[oldBoreholeId] || [];
+        delete next[oldBoreholeId];
+        return next;
+      });
+      setSamplingRecords(prev => {
+        const next = { ...prev };
+        next[newBoreholeId] = prev[oldBoreholeId] || [];
+        delete next[oldBoreholeId];
+        return next;
+      });
+      setWaterLevelRecords(prev => {
+        const next = { ...prev };
+        next[newBoreholeId] = prev[oldBoreholeId] || [];
+        delete next[oldBoreholeId];
+        return next;
+      });
+      if (selectedBorehole === oldBoreholeId) {
+        setSelectedBorehole(newBoreholeId);
+      }
+    }
+
+    setRecords(prev => prev.map(r => r["钻孔编号"] === oldBoreholeId ? trimmedRecord : r));
+    setFormData(emptyForm);
+    setEditingRecordId(null);
+    setErrors({});
+  };
+
+  const handleDeleteRecord = (boreholeId: string) => {
+    if (!confirm(`确定要删除钻孔 ${boreholeId} 吗？\n删除后该钻孔的所有分层、标贯、取样、水位数据都将丢失。`)) return;
+    setRecords(prev => prev.filter(r => r["钻孔编号"] !== boreholeId));
+    setBoreholeLayers(prev => {
+      const next = { ...prev };
+      delete next[boreholeId];
+      return next;
+    });
+    setSPTRecords(prev => {
+      const next = { ...prev };
+      delete next[boreholeId];
+      return next;
+    });
+    setSamplingRecords(prev => {
+      const next = { ...prev };
+      delete next[boreholeId];
+      return next;
+    });
+    setWaterLevelRecords(prev => {
+      const next = { ...prev };
+      delete next[boreholeId];
+      return next;
+    });
+    if (selectedBorehole === boreholeId) {
+      const remaining = records.filter(r => r["钻孔编号"] !== boreholeId);
+      setSelectedBorehole(remaining.length > 0 ? remaining[0]["钻孔编号"] : null);
+    }
+    if (editingRecordId === boreholeId) {
+      setFormData(emptyForm);
+      setEditingRecordId(null);
+    }
+  };
+
   const allSPTForSummary = useMemo(() => {
     const targetRecords = activeFilter ? filteredRecords : records;
     const result: { boreholeId: string; depth: string; blowCount: string; isAbnormal: boolean; lithology: string; remark: string }[] = [];
@@ -1168,22 +1276,39 @@ function App() {
           <div className="section-heading">
             <div>
               <p>{project.domain}</p>
-              <h2>新增钻孔</h2>
+              <h2>{editingRecordId ? "编辑钻孔" : "新增钻孔"} {editingRecordId && <span className="check-badge">编辑中</span>}</h2>
             </div>
-            <button
-              className={`primary-action ${!permissions.canAddRecord ? "btn-disabled" : ""}`}
-              onClick={permissions.canAddRecord ? handleAddRecord : undefined}
-              disabled={!permissions.canAddRecord}
-              title={!permissions.canAddRecord ? "当前角色无新增钻孔权限" : ""}
-            >
-              {permissions.canAddRecord ? "新增记录" : "无权限新增"}
-            </button>
+            {editingRecordId ? (
+              <>
+                <button
+                  className="secondary-action"
+                  onClick={handleCancelEditRecord}
+                >
+                  取消
+                </button>
+                <button
+                  className="primary-action"
+                  onClick={handleUpdateRecord}
+                >
+                  保存修改
+                </button>
+              </>
+            ) : (
+              <button
+                className={`primary-action ${!permissions.canAddRecord ? "btn-disabled" : ""}`}
+                onClick={permissions.canAddRecord ? handleAddRecord : undefined}
+                disabled={!permissions.canAddRecord}
+                title={!permissions.canAddRecord ? "当前角色无新增钻孔权限" : ""}
+              >
+                {permissions.canAddRecord ? "新增记录" : "无权限新增"}
+              </button>
+            )}
           </div>
-          {!permissions.canAddRecord ? (
+          {!permissions.canAddRecord && !editingRecordId ? (
             <div className="permission-empty-state">
               <span className="empty-lock-icon">🔐</span>
               <h4>新增钻孔功能受限</h4>
-              <p>当前角色为「{currentRole}」，仅「现场编录员」可新增钻孔记录</p>
+              <p>当前角色为「{currentRole}」，仅「现场编录员」可新增和编辑钻孔记录</p>
             </div>
           ) : (
             <div className="field-grid">
@@ -1324,13 +1449,36 @@ function App() {
               const bhSPT = sptRecords[record["钻孔编号"]] || [];
               const bhSampling = samplingRecords[record["钻孔编号"]] || [];
               const latestObservationText = getLatestWaterLevelObservationText(record["钻孔编号"]);
+              const isEditingThis = editingRecordId === record["钻孔编号"];
               return (
-                <article key={record["钻孔编号"] + "-" + index} className={`borehole-item ${selectedBorehole === record["钻孔编号"] ? "borehole-selected" : ""}`} onClick={() => handleSelectBorehole(record["钻孔编号"])}>
+                <article key={record["钻孔编号"] + "-" + index} className={`borehole-item ${selectedBorehole === record["钻孔编号"] ? "borehole-selected" : ""} ${isEditingThis ? "borehole-editing" : ""}`} onClick={() => handleSelectBorehole(record["钻孔编号"])}>
                   <div className="borehole-index">{String(index + 1).padStart(2, "0")}</div>
                   <div className="borehole-info">
-                    <h3>{record["钻孔编号"]} <span className="tag">{record["岩性分类"]}</span></h3>
+                    <h3>
+                      {record["钻孔编号"]} <span className="tag">{record["岩性分类"]}</span>
+                      {isEditingThis && <span className="check-badge">编辑中</span>}
+                    </h3>
                     <p>孔深{record["孔深"]}m · 水位{latestObservationText} · 标贯{bhSPT.length}次 · 取样{bhSampling.length}组</p>
                   </div>
+                  {permissions.canEditRecord && (
+                    <div className="borehole-actions" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        className={`action-btn ${isEditingThis ? "btn-disabled" : ""}`}
+                        onClick={() => handleEditRecord(record)}
+                        disabled={isEditingThis}
+                        title={isEditingThis ? "该钻孔正在编辑" : "编辑钻孔"}
+                      >
+                        编辑
+                      </button>
+                      <button
+                        className="action-btn action-delete"
+                        onClick={() => handleDeleteRecord(record["钻孔编号"])}
+                        title="删除钻孔"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  )}
                 </article>
               );
             })}
@@ -1363,10 +1511,10 @@ function App() {
                       return (
                         <div
                           key={layer.id}
-                          className={`stratum-layer litho-${idx % 6} ${!permissions.canEditLayer ? "layer-readonly" : ""}`}
+                          className={`stratum-layer litho-${idx % 6} ${!permissions.canEditLayer || isCheckMode ? "layer-readonly" : ""}`}
                           style={{ top: `${topPercent}%`, height: `${heightPercent}%` }}
-                          onClick={permissions.canEditLayer ? () => handleEditLayer(layer) : undefined}
-                          title={!permissions.canEditLayer ? "当前角色无分层编辑权限" : "点击编辑该层"}
+                          onClick={permissions.canEditLayer && !isCheckMode ? () => handleEditLayer(layer) : undefined}
+                          title={isCheckMode ? "校核模式，点击查看详情" : !permissions.canEditLayer ? "当前角色无分层编辑权限" : "点击编辑该层"}
                         >
                           <span className="layer-depth-top">{layer.startDepth}</span>
                           <span className="layer-name">{layer.lithology}</span>
@@ -1421,24 +1569,25 @@ function App() {
 
               <div className="layer-form-section">
                 <h3>
-                  {editingLayerId ? (permissions.canCheckLayer ? "校核分层" : "编辑分层") : "新增分层"}
-                  {permissions.canCheckLayer && permissions.canEditLayer && currentRole === "岩土工程师" && <span className="check-badge">校核模式</span>}
+                  {editingLayerId ? (isCheckMode ? "校核分层" : "编辑分层") : "新增分层"}
+                  {isCheckMode && <span className="check-badge">校核模式</span>}
+                  {isCheckMode && <span className="check-hint">（仅可修改备注）</span>}
                 </h3>
                 {!permissions.canEditLayer ? (
                   <div className="permission-empty-state">
                     <span className="empty-lock-icon">🔐</span>
                     <h4>分层编辑功能受限</h4>
-                    <p>当前角色为「{currentRole}」，{permissions.canCheckLayer ? "可校核分层数据" : "仅可查看看板数据"}</p>
+                    <p>当前角色为「{currentRole}」，仅「现场编录员」可新增和编辑分层数据</p>
                   </div>
                 ) : (
                   <>
                     <div className="layer-form-grid">
-                      <label><span>起始深度 (m)</span><input type="number" step="0.1" className={layerErrors.startDepth ? "input-error" : ""} placeholder="起始深度" value={layerForm.startDepth} onChange={(e) => handleLayerInputChange("startDepth", e.target.value)} />{layerErrors.startDepth && <em className="error-tip">{layerErrors.startDepth}</em>}</label>
-                      <label><span>终止深度 (m)</span><input type="number" step="0.1" className={layerErrors.endDepth ? "input-error" : ""} placeholder="终止深度" value={layerForm.endDepth} onChange={(e) => handleLayerInputChange("endDepth", e.target.value)} />{layerErrors.endDepth && <em className="error-tip">{layerErrors.endDepth}</em>}</label>
-                      <label><span>岩性</span><select className={layerErrors.lithology ? "input-error" : ""} value={layerForm.lithology} onChange={(e) => handleLayerInputChange("lithology", e.target.value)}><option value="">选择岩性</option>{lithologyOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select>{layerErrors.lithology && <em className="error-tip">{layerErrors.lithology}</em>}</label>
-                      <label><span>土色</span><select className={layerErrors.soilColor ? "input-error" : ""} value={layerForm.soilColor} onChange={(e) => handleLayerInputChange("soilColor", e.target.value)}><option value="">选择土色</option>{soilColorOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select>{layerErrors.soilColor && <em className="error-tip">{layerErrors.soilColor}</em>}</label>
-                      <label><span>密实度/状态</span><select className={layerErrors.density ? "input-error" : ""} value={layerForm.density} onChange={(e) => handleLayerInputChange("density", e.target.value)}><option value="">选择密实度/状态</option>{densityOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select>{layerErrors.density && <em className="error-tip">{layerErrors.density}</em>}</label>
-                      <label className="full-width"><span>描述</span><input placeholder="分层描述" value={layerForm.description} onChange={(e) => handleLayerInputChange("description", e.target.value)} /></label>
+                      <label><span>起始深度 (m)</span><input type="number" step="0.1" className={`${layerErrors.startDepth ? "input-error" : ""} ${isCheckMode ? "input-readonly" : ""}`} placeholder="起始深度" value={layerForm.startDepth} onChange={(e) => handleLayerInputChange("startDepth", e.target.value)} disabled={isCheckMode} readOnly={isCheckMode} />{layerErrors.startDepth && <em className="error-tip">{layerErrors.startDepth}</em>}{isCheckMode && <em className="check-tip">校核模式，不可修改</em>}</label>
+                      <label><span>终止深度 (m)</span><input type="number" step="0.1" className={`${layerErrors.endDepth ? "input-error" : ""} ${isCheckMode ? "input-readonly" : ""}`} placeholder="终止深度" value={layerForm.endDepth} onChange={(e) => handleLayerInputChange("endDepth", e.target.value)} disabled={isCheckMode} readOnly={isCheckMode} />{layerErrors.endDepth && <em className="error-tip">{layerErrors.endDepth}</em>}{isCheckMode && <em className="check-tip">校核模式，不可修改</em>}</label>
+                      <label><span>岩性</span><select className={`${layerErrors.lithology ? "input-error" : ""} ${isCheckMode ? "input-readonly" : ""}`} value={layerForm.lithology} onChange={(e) => handleLayerInputChange("lithology", e.target.value)} disabled={isCheckMode}><option value="">选择岩性</option>{lithologyOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select>{layerErrors.lithology && <em className="error-tip">{layerErrors.lithology}</em>}{isCheckMode && <em className="check-tip">校核模式，不可修改</em>}</label>
+                      <label><span>土色</span><select className={`${layerErrors.soilColor ? "input-error" : ""} ${isCheckMode ? "input-readonly" : ""}`} value={layerForm.soilColor} onChange={(e) => handleLayerInputChange("soilColor", e.target.value)} disabled={isCheckMode}><option value="">选择土色</option>{soilColorOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select>{layerErrors.soilColor && <em className="error-tip">{layerErrors.soilColor}</em>}{isCheckMode && <em className="check-tip">校核模式，不可修改</em>}</label>
+                      <label><span>密实度/状态</span><select className={`${layerErrors.density ? "input-error" : ""} ${isCheckMode ? "input-readonly" : ""}`} value={layerForm.density} onChange={(e) => handleLayerInputChange("density", e.target.value)} disabled={isCheckMode}><option value="">选择密实度/状态</option>{densityOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select>{layerErrors.density && <em className="error-tip">{layerErrors.density}</em>}{isCheckMode && <em className="check-tip">校核模式，不可修改</em>}</label>
+                      <label className="full-width"><span>描述{isCheckMode ? " <em className=\"check-tip\">(校核说明)</em>" : ""}</span><input placeholder={isCheckMode ? "请填写校核说明或备注" : "分层描述"} value={layerForm.description} onChange={(e) => handleLayerInputChange("description", e.target.value)} /></label>
                     </div>
                     {layerValidationMessage && (<div className="layer-validation-error">{layerValidationMessage}</div>)}
                     {gapMessage && sortedLayers.length > 0 && (<div className="layer-gap-warning">{gapMessage}</div>)}
@@ -1447,11 +1596,13 @@ function App() {
                         <>
                           <button className="secondary-btn" onClick={handleCancelEdit}>取消</button>
                           <button className="primary-action" onClick={handleUpdateLayer}>
-                            {permissions.canCheckLayer && currentRole === "岩土工程师" ? "确认校核" : "更新分层"}
+                            {isCheckMode ? "确认校核" : "更新分层"}
                           </button>
                         </>
                       ) : (
-                        <button className="primary-action" onClick={handleAddLayer}>添加分层</button>
+                        <button className={`primary-action ${isCheckMode ? "btn-disabled" : ""}`} onClick={!isCheckMode ? handleAddLayer : undefined} disabled={isCheckMode} title={isCheckMode ? "校核模式，不可新增分层" : ""}>
+                          {isCheckMode ? "无权限新增" : "添加分层"}
+                        </button>
                       )}
                     </div>
                   </>
@@ -1481,10 +1632,10 @@ function App() {
                                 {permissions.canCheckLayer && currentRole === "岩土工程师" ? "校核" : "编辑"}
                               </button>
                               <button
-                                className={`small-btn danger-btn ${!permissions.canEditLayer ? "btn-disabled" : ""}`}
-                                onClick={permissions.canEditLayer ? () => handleDeleteLayer(layer.id) : undefined}
-                                disabled={!permissions.canEditLayer}
-                                title={!permissions.canEditLayer ? "当前角色无删除权限" : ""}
+                                className={`small-btn danger-btn ${!permissions.canEditLayer || isCheckMode ? "btn-disabled" : ""}`}
+                                onClick={permissions.canEditLayer && !isCheckMode ? () => handleDeleteLayer(layer.id) : undefined}
+                                disabled={!permissions.canEditLayer || isCheckMode}
+                                title={isCheckMode ? "校核模式，不可删除" : !permissions.canEditLayer ? "当前角色无删除权限" : ""}
                               >
                                 删除
                               </button>
@@ -1505,8 +1656,9 @@ function App() {
                   </div>
                   <div className="spt-form-section">
                     <h4>
-                      {editingSPTId ? (permissions.canCheckSPT ? "校核标贯记录" : "编辑标贯记录") : "新增标贯记录"}
-                      {permissions.canCheckSPT && permissions.canEditSPT && currentRole === "岩土工程师" && <span className="check-badge">校核模式</span>}
+                      {editingSPTId ? (isCheckMode ? "校核标贯记录" : "编辑标贯记录") : "新增标贯记录"}
+                      {isCheckMode && <span className="check-badge">校核模式</span>}
+                      {isCheckMode && <span className="check-hint">（仅可标记异常和修改备注）</span>}
                     </h4>
                     {!permissions.canEditSPT ? (
                       <div className="permission-empty-state">
@@ -1517,10 +1669,10 @@ function App() {
                     ) : (
                       <>
                         <div className="spt-form-grid">
-                          <label><span>试验深度 (m)</span><input type="number" step="0.1" className={sptErrors.depth ? "input-error" : ""} placeholder="标贯试验深度" value={sptForm.depth} onChange={(e) => handleSPTInputChange("depth", e.target.value)} />{sptErrors.depth && <em className="error-tip">{sptErrors.depth}</em>}</label>
-                          <label><span>标贯击数</span><input type="number" step="1" className={sptErrors.blowCount ? "input-error" : ""} placeholder="击数" value={sptForm.blowCount} onChange={(e) => handleSPTInputChange("blowCount", e.target.value)} />{sptErrors.blowCount && <em className="error-tip">{sptErrors.blowCount}</em>}</label>
-                          <label className="checkbox-label"><span>是否异常</span><div className="checkbox-wrapper"><input type="checkbox" checked={sptForm.isAbnormal} onChange={(e) => handleSPTInputChange("isAbnormal", e.target.checked)} /><span className="checkbox-text">{sptForm.isAbnormal ? "是（需复核）" : "否（正常）"}</span></div></label>
-                          <label className="full-width"><span>备注</span><input placeholder="异常原因或其他说明" value={sptForm.remark} onChange={(e) => handleSPTInputChange("remark", e.target.value)} /></label>
+                          <label><span>试验深度 (m)</span><input type="number" step="0.1" className={`${sptErrors.depth ? "input-error" : ""} ${isCheckMode ? "input-readonly" : ""}`} placeholder="标贯试验深度" value={sptForm.depth} onChange={(e) => handleSPTInputChange("depth", e.target.value)} disabled={isCheckMode} readOnly={isCheckMode} />{sptErrors.depth && <em className="error-tip">{sptErrors.depth}</em>}{isCheckMode && <em className="check-tip">校核模式，不可修改</em>}</label>
+                          <label><span>标贯击数</span><input type="number" step="1" className={`${sptErrors.blowCount ? "input-error" : ""} ${isCheckMode ? "input-readonly" : ""}`} placeholder="击数" value={sptForm.blowCount} onChange={(e) => handleSPTInputChange("blowCount", e.target.value)} disabled={isCheckMode} readOnly={isCheckMode} />{sptErrors.blowCount && <em className="error-tip">{sptErrors.blowCount}</em>}{isCheckMode && <em className="check-tip">校核模式，不可修改</em>}</label>
+                          <label className="checkbox-label"><span>是否异常{isCheckMode ? " <em className=\"check-tip\">(校核标记)</em>" : ""}</span><div className="checkbox-wrapper"><input type="checkbox" checked={sptForm.isAbnormal} onChange={(e) => handleSPTInputChange("isAbnormal", e.target.checked)} /><span className="checkbox-text">{sptForm.isAbnormal ? "是（需复核）" : "否（正常）"}</span></div></label>
+                          <label className="full-width"><span>备注{isCheckMode ? " <em className=\"check-tip\">(校核说明)</em>" : ""}</span><input placeholder={isCheckMode ? "请填写校核说明或备注" : "异常原因或其他说明"} value={sptForm.remark} onChange={(e) => handleSPTInputChange("remark", e.target.value)} /></label>
                         </div>
                         {sptValidationMessage && (<div className="spt-validation-error">{sptValidationMessage}</div>)}
                         <div className="spt-form-actions">
@@ -1528,10 +1680,12 @@ function App() {
                             <>
                               <button className="secondary-btn" onClick={handleCancelSPTEdit}>取消</button>
                               <button className="primary-action" onClick={handleUpdateSPTRecord}>
-                                {permissions.canCheckSPT && currentRole === "岩土工程师" ? "确认校核" : "更新记录"}
+                                {isCheckMode ? "确认校核" : "更新记录"}
                               </button>
                             </>
-                          ) : (<button className="primary-action" onClick={handleAddSPTRecord}>添加标贯记录</button>)}
+                          ) : (<button className={`primary-action ${isCheckMode ? "btn-disabled" : ""}`} onClick={!isCheckMode ? handleAddSPTRecord : undefined} disabled={isCheckMode} title={isCheckMode ? "校核模式，不可新增标贯记录" : ""}>
+                            {isCheckMode ? "无权限新增" : "添加标贯记录"}
+                          </button>)}
                         </div>
                       </>
                     )}
@@ -1560,10 +1714,10 @@ function App() {
                                   {permissions.canCheckSPT && currentRole === "岩土工程师" ? "校核" : "编辑"}
                                 </button>
                                 <button
-                                  className={`small-btn danger-btn ${!permissions.canEditSPT ? "btn-disabled" : ""}`}
-                                  onClick={permissions.canEditSPT ? () => handleDeleteSPTRecord(record.id) : undefined}
-                                  disabled={!permissions.canEditSPT}
-                                  title={!permissions.canEditSPT ? "当前角色无删除权限" : ""}
+                                  className={`small-btn danger-btn ${!permissions.canEditSPT || isCheckMode ? "btn-disabled" : ""}`}
+                                  onClick={permissions.canEditSPT && !isCheckMode ? () => handleDeleteSPTRecord(record.id) : undefined}
+                                  disabled={!permissions.canEditSPT || isCheckMode}
+                                  title={isCheckMode ? "校核模式，不可删除" : !permissions.canEditSPT ? "当前角色无删除权限" : ""}
                                 >
                                   删除
                                 </button>

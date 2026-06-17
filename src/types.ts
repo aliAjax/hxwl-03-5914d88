@@ -118,7 +118,7 @@ export const rolePermissions: Record<Role, Permissions> = {
 };
 
 export const roleDescriptions: Record<Role, string> = {
-  "现场编录员": "可新增和编辑所有记录",
-  "岩土工程师": "可校核分层和标贯数据",
+  "现场编录员": "可新增、编辑和删除所有记录",
+  "岩土工程师": "仅可校核分层和标贯数据的异常标记和备注",
   "项目负责人": "仅查看看板和导出摘要",
 };
