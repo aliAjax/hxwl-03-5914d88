@@ -398,9 +398,6 @@ function App() {
         return record.stableLevel;
       }
     }
-    if (sorted.length > 0 && sorted[0].firstSeenLevel && sorted[0].firstSeenLevel.trim()) {
-      return sorted[0].firstSeenLevel;
-    }
     return "";
   }, [waterLevelRecords]);
 
@@ -419,6 +416,24 @@ function App() {
     }
     if (sorted[0].firstSeenLevel && sorted[0].firstSeenLevel.trim()) {
       return `初见${sorted[0].firstSeenLevel}m`;
+    }
+    return "未观测";
+  }, [waterLevelRecords]);
+
+  const getLatestWaterLevelObservationText = useCallback((boreholeId: string): string => {
+    const records = waterLevelRecords[boreholeId] || [];
+    if (records.length === 0) return "未观测";
+    const [latest] = [...records].sort((a, b) => {
+      const timeA = a.observationTime ? new Date(a.observationTime).getTime() : 0;
+      const timeB = b.observationTime ? new Date(b.observationTime).getTime() : 0;
+      return timeB - timeA;
+    });
+    if (!latest) return "未观测";
+    if (latest.stableLevel && latest.stableLevel.trim()) {
+      return `稳定${latest.stableLevel}m`;
+    }
+    if (latest.firstSeenLevel && latest.firstSeenLevel.trim()) {
+      return `初见${latest.firstSeenLevel}m·待稳定`;
     }
     return "未观测";
   }, [waterLevelRecords]);
@@ -1126,7 +1141,7 @@ function App() {
                       <div className="wl-latest-item">
                         <span className="wl-label">稳定水位</span>
                         <strong className={`wl-value ${!latestWaterLevel.stableLevel ? "wl-pending" : ""}`}>
-                          {latestWaterLevel.stableLevel || "待稳定"}m
+                          {latestWaterLevel.stableLevel ? `${latestWaterLevel.stableLevel}m` : "待稳定"}
                         </strong>
                       </div>
                     </div>
@@ -1164,12 +1179,13 @@ function App() {
             {filteredRecords.map((record, index: number) => {
               const bhSPT = sptRecords[record["钻孔编号"]] || [];
               const bhSampling = samplingRecords[record["钻孔编号"]] || [];
+              const latestObservationText = getLatestWaterLevelObservationText(record["钻孔编号"]);
               return (
                 <article key={record["钻孔编号"] + "-" + index} className={`borehole-item ${selectedBorehole === record["钻孔编号"] ? "borehole-selected" : ""}`} onClick={() => handleSelectBorehole(record["钻孔编号"])}>
                   <div className="borehole-index">{String(index + 1).padStart(2, "0")}</div>
                   <div className="borehole-info">
                     <h3>{record["钻孔编号"]} <span className="tag">{record["岩性分类"]}</span></h3>
-                    <p>孔深{record["孔深"]}m · 标贯{bhSPT.length}次 · 取样{bhSampling.length}组</p>
+                    <p>孔深{record["孔深"]}m · 水位{latestObservationText} · 标贯{bhSPT.length}次 · 取样{bhSampling.length}组</p>
                   </div>
                 </article>
               );
