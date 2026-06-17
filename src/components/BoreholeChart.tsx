@@ -242,21 +242,6 @@ const validateData = (
       }
     }
 
-    if (
-      wl.firstSeenLevel.trim() &&
-      wl.stableLevel.trim() &&
-      !isNaN(firstSeen) &&
-      !isNaN(stable) &&
-      firstSeen > 0 &&
-      stable > 0 &&
-      firstSeen < stable
-    ) {
-      issues.push({
-        type: "error",
-        message: `第 ${i + 1} 条水位记录异常：稳定水位 ${stable}m 深于初见水位 ${firstSeen}m（稳定水位应浅于或等于初见水位）`,
-        severity: 8,
-      });
-    }
   }
 
   const hasErrors = issues.some((i) => i.type === "error");
