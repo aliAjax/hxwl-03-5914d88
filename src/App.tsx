@@ -2499,7 +2499,7 @@ function App() {
                 <div className="summary-table-wrapper">
                   <table className="summary-table">
                     <thead>
-                      <tr><th>序号</th><th>钻孔编号</th><th>孔深</th><th>岩性分类</th><th>地下水位</th><th>标贯</th><th>取样</th><th>地层</th></tr>
+                      <tr><th>序号</th><th>钻孔编号</th><th>孔深</th><th>岩性分类</th><th>地下水位</th><th>最近观测</th><th>标贯</th><th>取样</th><th>地层</th></tr>
                     </thead>
                     <tbody>
                       {filteredRecords.map((r, i) => {
@@ -2507,6 +2507,7 @@ function App() {
                         const bhSampling = samplingRecords[r["钻孔编号"]] || [];
                         const bhLayers = boreholeLayers[r["钻孔编号"]] || [];
                         const wlDisplay = getWaterLevelDisplayText(r["钻孔编号"]);
+                        const latestObservation = getLatestWaterLevelObservationText(r["钻孔编号"]);
                         return (
                           <tr key={r["钻孔编号"]}>
                             <td>{i + 1}</td>
@@ -2514,6 +2515,7 @@ function App() {
                             <td>{r["孔深"]}m</td>
                             <td><span className="tag">{r["岩性分类"]}</span></td>
                             <td>{wlDisplay}</td>
+                            <td>{latestObservation}</td>
                             <td>{bhSPT.length}次</td>
                             <td>{bhSampling.length}组</td>
                             <td className="layer-count">共{bhLayers.length}层</td>
