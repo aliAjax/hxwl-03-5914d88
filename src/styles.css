@@ -2093,6 +2093,14 @@ button:disabled:hover {
   font-style: normal !important;
 }
 
+.inline-check-tip {
+  margin-left: 6px;
+  color: #7c3aed;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 500;
+}
+
 .input-readonly {
   background: #f1f5f9 !important;
   color: #64748b !important;

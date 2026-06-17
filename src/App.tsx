@@ -945,6 +945,7 @@ function App() {
   };
 
   const handleEditRecord = (record: DrillingRecord) => {
+    if (!permissions.canEditRecord) return;
     setFormData({ ...record });
     setEditingRecordId(record["钻孔编号"]);
     setErrors({});
@@ -973,6 +974,7 @@ function App() {
   };
 
   const handleUpdateRecord = () => {
+    if (!permissions.canEditRecord) return;
     if (!validateUpdate() || !editingRecordId) return;
     const oldBoreholeId = editingRecordId;
     const newBoreholeId = formData["钻孔编号"].trim();
@@ -1018,6 +1020,7 @@ function App() {
   };
 
   const handleDeleteRecord = (boreholeId: string) => {
+    if (!permissions.canDeleteRecord) return;
     if (!confirm(`确定要删除钻孔 ${boreholeId} 吗？\n删除后该钻孔的所有分层、标贯、取样、水位数据都将丢失。`)) return;
     setRecords(prev => prev.filter(r => r["钻孔编号"] !== boreholeId));
     setBoreholeLayers(prev => {
@@ -1049,6 +1052,14 @@ function App() {
       setEditingRecordId(null);
     }
   };
+
+  useEffect(() => {
+    if (!permissions.canEditRecord && editingRecordId) {
+      setFormData(emptyForm);
+      setEditingRecordId(null);
+      setErrors({});
+    }
+  }, [permissions.canEditRecord, editingRecordId]);
 
   const allSPTForSummary = useMemo(() => {
     const targetRecords = activeFilter ? filteredRecords : records;
@@ -1587,7 +1598,7 @@ function App() {
                       <label><span>岩性</span><select className={`${layerErrors.lithology ? "input-error" : ""} ${isCheckMode ? "input-readonly" : ""}`} value={layerForm.lithology} onChange={(e) => handleLayerInputChange("lithology", e.target.value)} disabled={isCheckMode}><option value="">选择岩性</option>{lithologyOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select>{layerErrors.lithology && <em className="error-tip">{layerErrors.lithology}</em>}{isCheckMode && <em className="check-tip">校核模式，不可修改</em>}</label>
                       <label><span>土色</span><select className={`${layerErrors.soilColor ? "input-error" : ""} ${isCheckMode ? "input-readonly" : ""}`} value={layerForm.soilColor} onChange={(e) => handleLayerInputChange("soilColor", e.target.value)} disabled={isCheckMode}><option value="">选择土色</option>{soilColorOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select>{layerErrors.soilColor && <em className="error-tip">{layerErrors.soilColor}</em>}{isCheckMode && <em className="check-tip">校核模式，不可修改</em>}</label>
                       <label><span>密实度/状态</span><select className={`${layerErrors.density ? "input-error" : ""} ${isCheckMode ? "input-readonly" : ""}`} value={layerForm.density} onChange={(e) => handleLayerInputChange("density", e.target.value)} disabled={isCheckMode}><option value="">选择密实度/状态</option>{densityOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select>{layerErrors.density && <em className="error-tip">{layerErrors.density}</em>}{isCheckMode && <em className="check-tip">校核模式，不可修改</em>}</label>
-                      <label className="full-width"><span>描述{isCheckMode ? " <em className=\"check-tip\">(校核说明)</em>" : ""}</span><input placeholder={isCheckMode ? "请填写校核说明或备注" : "分层描述"} value={layerForm.description} onChange={(e) => handleLayerInputChange("description", e.target.value)} /></label>
+                      <label className="full-width"><span>描述{isCheckMode && <em className="inline-check-tip">(校核说明)</em>}</span><input placeholder={isCheckMode ? "请填写校核说明或备注" : "分层描述"} value={layerForm.description} onChange={(e) => handleLayerInputChange("description", e.target.value)} /></label>
                     </div>
                     {layerValidationMessage && (<div className="layer-validation-error">{layerValidationMessage}</div>)}
                     {gapMessage && sortedLayers.length > 0 && (<div className="layer-gap-warning">{gapMessage}</div>)}
@@ -1671,8 +1682,8 @@ function App() {
                         <div className="spt-form-grid">
                           <label><span>试验深度 (m)</span><input type="number" step="0.1" className={`${sptErrors.depth ? "input-error" : ""} ${isCheckMode ? "input-readonly" : ""}`} placeholder="标贯试验深度" value={sptForm.depth} onChange={(e) => handleSPTInputChange("depth", e.target.value)} disabled={isCheckMode} readOnly={isCheckMode} />{sptErrors.depth && <em className="error-tip">{sptErrors.depth}</em>}{isCheckMode && <em className="check-tip">校核模式，不可修改</em>}</label>
                           <label><span>标贯击数</span><input type="number" step="1" className={`${sptErrors.blowCount ? "input-error" : ""} ${isCheckMode ? "input-readonly" : ""}`} placeholder="击数" value={sptForm.blowCount} onChange={(e) => handleSPTInputChange("blowCount", e.target.value)} disabled={isCheckMode} readOnly={isCheckMode} />{sptErrors.blowCount && <em className="error-tip">{sptErrors.blowCount}</em>}{isCheckMode && <em className="check-tip">校核模式，不可修改</em>}</label>
-                          <label className="checkbox-label"><span>是否异常{isCheckMode ? " <em className=\"check-tip\">(校核标记)</em>" : ""}</span><div className="checkbox-wrapper"><input type="checkbox" checked={sptForm.isAbnormal} onChange={(e) => handleSPTInputChange("isAbnormal", e.target.checked)} /><span className="checkbox-text">{sptForm.isAbnormal ? "是（需复核）" : "否（正常）"}</span></div></label>
-                          <label className="full-width"><span>备注{isCheckMode ? " <em className=\"check-tip\">(校核说明)</em>" : ""}</span><input placeholder={isCheckMode ? "请填写校核说明或备注" : "异常原因或其他说明"} value={sptForm.remark} onChange={(e) => handleSPTInputChange("remark", e.target.value)} /></label>
+                          <label className="checkbox-label"><span>是否异常{isCheckMode && <em className="inline-check-tip">(校核标记)</em>}</span><div className="checkbox-wrapper"><input type="checkbox" checked={sptForm.isAbnormal} onChange={(e) => handleSPTInputChange("isAbnormal", e.target.checked)} /><span className="checkbox-text">{sptForm.isAbnormal ? "是（需复核）" : "否（正常）"}</span></div></label>
+                          <label className="full-width"><span>备注{isCheckMode && <em className="inline-check-tip">(校核说明)</em>}</span><input placeholder={isCheckMode ? "请填写校核说明或备注" : "异常原因或其他说明"} value={sptForm.remark} onChange={(e) => handleSPTInputChange("remark", e.target.value)} /></label>
                         </div>
                         {sptValidationMessage && (<div className="spt-validation-error">{sptValidationMessage}</div>)}
                         <div className="spt-form-actions">
