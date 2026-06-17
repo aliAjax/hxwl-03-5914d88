@@ -1,57 +1,17 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import "./styles.css";
-
-interface StratumLayer {
-  id: string;
-  startDepth: string;
-  endDepth: string;
-  lithology: string;
-  soilColor: string;
-  density: string;
-  description: string;
-}
-
-interface BoreholeLayers {
-  [boreholeId: string]: StratumLayer[];
-}
-
-interface SPTRecord {
-  id: string;
-  depth: string;
-  blowCount: string;
-  isAbnormal: boolean;
-  remark: string;
-  layerId: string;
-}
-
-interface BoreholeSPTRecords {
-  [boreholeId: string]: SPTRecord[];
-}
-
-interface SamplingRecord {
-  id: string;
-  depth: string;
-  sampleType: string;
-  sampleNumber: string;
-  remark: string;
-  layerId: string;
-}
-
-interface BoreholeSamplingRecords {
-  [boreholeId: string]: SamplingRecord[];
-}
-
-interface WaterLevelRecord {
-  id: string;
-  firstSeenLevel: string;
-  stableLevel: string;
-  observationTime: string;
-  weatherRemark: string;
-}
-
-interface BoreholeWaterLevelRecords {
-  [boreholeId: string]: WaterLevelRecord[];
-}
+import type {
+  StratumLayer,
+  BoreholeLayers,
+  SPTRecord,
+  BoreholeSPTRecords,
+  SamplingRecord,
+  BoreholeSamplingRecords,
+  WaterLevelRecord,
+  BoreholeWaterLevelRecords,
+  DrillingRecord,
+} from "./types";
+import { saveProjectData, loadProjectData, clearProjectData, type ProjectData } from "./db";
 
 const lithologyOptions = ["黏土", "粉质黏土", "粉土", "粉砂", "细砂", "中砂", "粗砂", "卵石", "圆砾", "强风化岩", "中风化岩", "微风化岩"];
 const soilColorOptions = ["褐黄色", "黄褐色", "灰黄色", "灰白色", "灰色", "灰褐色", "紫红色", "杂色"];
@@ -221,15 +181,6 @@ const project = {
 
 type FieldName = typeof project.fields[number];
 
-interface DrillingRecord {
-  "钻孔编号": string;
-  "孔深": string;
-  "岩性分类": string;
-  "岩性描述": string;
-  "土色": string;
-  "地下水位": string;
-}
-
 const initialRecords: DrillingRecord[] = [
   { "钻孔编号": "ZK-18", "孔深": "22.6", "岩性分类": "黏土", "岩性描述": "粉质黏土", "土色": "褐黄色", "地下水位": "3.4" },
   { "钻孔编号": "ZK-21", "孔深": "31.2", "岩性分类": "卵石", "岩性描述": "卵石层", "土色": "杂色", "地下水位": "2.8" },
@@ -290,37 +241,45 @@ const emptyWaterLevelForm: Omit<WaterLevelRecord, "id"> = {
 
 function App() {
   const [formData, setFormData] = useState<DrillingRecord>(emptyForm);
-  const [records, setRecords] = useState<DrillingRecord[]>(initialRecords);
+  const [records, setRecords] = useState<DrillingRecord[]>([]);
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
 
-  const [boreholeLayers, setBoreholeLayers] = useState<BoreholeLayers>(initialLayers);
-  const [selectedBorehole, setSelectedBorehole] = useState<string | null>("ZK-18");
+  const [boreholeLayers, setBoreholeLayers] = useState<BoreholeLayers>({});
+  const [selectedBorehole, setSelectedBorehole] = useState<string | null>(null);
   const [layerForm, setLayerForm] = useState<Omit<StratumLayer, "id">>(emptyLayerForm);
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
   const [layerErrors, setLayerErrors] = useState<Partial<Record<keyof StratumLayer, string>>>({});
   const [layerValidationMessage, setLayerValidationMessage] = useState<string>("");
   const [gapMessage, setGapMessage] = useState<string>("");
 
-  const [sptRecords, setSPTRecords] = useState<BoreholeSPTRecords>(initialSPTRecords);
+  const [sptRecords, setSPTRecords] = useState<BoreholeSPTRecords>({});
   const [sptForm, setSPTForm] = useState<Omit<SPTRecord, "id" | "layerId">>(emptySPTForm);
   const [editingSPTId, setEditingSPTId] = useState<string | null>(null);
   const [sptErrors, setSPTErrors] = useState<Partial<Record<keyof SPTRecord, string>>>({});
   const [sptValidationMessage, setSPTValidationMessage] = useState<string>("");
 
-  const [samplingRecords, setSamplingRecords] = useState<BoreholeSamplingRecords>(initialSamplingRecords);
+  const [samplingRecords, setSamplingRecords] = useState<BoreholeSamplingRecords>({});
   const [samplingForm, setSamplingForm] = useState<Omit<SamplingRecord, "id" | "layerId">>(emptySamplingForm);
   const [editingSamplingId, setEditingSamplingId] = useState<string | null>(null);
   const [samplingErrors, setSamplingErrors] = useState<Partial<Record<keyof SamplingRecord, string>>>({});
   const [samplingValidationMessage, setSamplingValidationMessage] = useState<string>("");
 
-  const [waterLevelRecords, setWaterLevelRecords] = useState<BoreholeWaterLevelRecords>(initialWaterLevelRecords);
+  const [waterLevelRecords, setWaterLevelRecords] = useState<BoreholeWaterLevelRecords>({});
   const [waterLevelForm, setWaterLevelForm] = useState<Omit<WaterLevelRecord, "id">>(emptyWaterLevelForm);
   const [editingWaterLevelId, setEditingWaterLevelId] = useState<string | null>(null);
   const [waterLevelErrors, setWaterLevelErrors] = useState<Partial<Record<keyof WaterLevelRecord, string>>>({});
   const [waterLevelValidationMessage, setWaterLevelValidationMessage] = useState<string>("");
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [lastSavedText, setLastSavedText] = useState<string>("");
+  const isFirstLoadRef = useRef(true);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentLayers = useMemo(() => {
     if (!selectedBorehole) return [];
@@ -1004,17 +963,156 @@ function App() {
     return result.sort((a, b) => parseFloat(a.depth) - parseFloat(b.depth));
   }, [records, filteredRecords, activeFilter, samplingRecords, getLayerLithology]);
 
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const saved = await loadProjectData();
+        if (saved && saved.initialized) {
+          setRecords(saved.records);
+          setBoreholeLayers(saved.boreholeLayers);
+          setSPTRecords(saved.sptRecords);
+          setSamplingRecords(saved.samplingRecords);
+          setWaterLevelRecords(saved.waterLevelRecords);
+          if (saved.records.length > 0) {
+            setSelectedBorehole(saved.records[0]["钻孔编号"]);
+          }
+          if (saved.lastSaved) {
+            const d = new Date(saved.lastSaved);
+            setLastSavedText(`上次保存：${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`);
+          }
+        } else {
+          setRecords(initialRecords);
+          setBoreholeLayers(initialLayers);
+          setSPTRecords(initialSPTRecords);
+          setSamplingRecords(initialSamplingRecords);
+          setWaterLevelRecords(initialWaterLevelRecords);
+          setSelectedBorehole("ZK-18");
+          try {
+            await saveProjectData({
+              records: initialRecords,
+              boreholeLayers: initialLayers,
+              sptRecords: initialSPTRecords,
+              samplingRecords: initialSamplingRecords,
+              waterLevelRecords: initialWaterLevelRecords,
+              initialized: true,
+            });
+            const d = new Date();
+            setLastSavedText(`上次保存：${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`);
+          } catch (saveErr) {
+            console.error("首次保存种子数据失败:", saveErr);
+            setSaveError(saveErr instanceof Error ? saveErr.message : "未知错误");
+          }
+        }
+      } catch (err) {
+        console.error("加载数据失败:", err);
+        setLoadError(err instanceof Error ? err.message : "未知错误");
+        setRecords(initialRecords);
+        setBoreholeLayers(initialLayers);
+        setSPTRecords(initialSPTRecords);
+        setSamplingRecords(initialSamplingRecords);
+        setWaterLevelRecords(initialWaterLevelRecords);
+        setSelectedBorehole("ZK-18");
+      } finally {
+        setIsLoading(false);
+        setTimeout(() => { isFirstLoadRef.current = false; }, 100);
+      }
+    };
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    if (isFirstLoadRef.current) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        setSaveError(null);
+        await saveProjectData({
+          records,
+          boreholeLayers,
+          sptRecords,
+          samplingRecords,
+          waterLevelRecords,
+          initialized: true,
+        });
+        const d = new Date();
+        setLastSavedText(`上次保存：${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`);
+      } catch (err) {
+        console.error("保存数据失败:", err);
+        setSaveError(err instanceof Error ? err.message : "未知错误");
+      }
+    }, 500);
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [records, boreholeLayers, sptRecords, samplingRecords, waterLevelRecords]);
+
+  const handleClearData = useCallback(async () => {
+    try {
+      await clearProjectData();
+      setRecords(initialRecords);
+      setBoreholeLayers(initialLayers);
+      setSPTRecords(initialSPTRecords);
+      setSamplingRecords(initialSamplingRecords);
+      setWaterLevelRecords(initialWaterLevelRecords);
+      setSelectedBorehole("ZK-18");
+      setSaveError(null);
+      setLoadError(null);
+      setLastSavedText("");
+      setShowClearConfirm(false);
+      isFirstLoadRef.current = false;
+    } catch (err) {
+      console.error("清空数据失败:", err);
+      setSaveError(err instanceof Error ? err.message : "未知错误");
+    }
+  }, []);
+
   return (
     <main className="app-shell">
+      {isLoading && (
+        <div className="loading-overlay">
+          <div className="loading-content">
+            <div className="loading-spinner"></div>
+            <p>正在加载项目数据...</p>
+          </div>
+        </div>
+      )}
+
+      {loadError && (
+        <div className="global-alert alert-error">
+          <div>
+            <strong>读取本地数据失败：</strong>
+            <span>{loadError}</span>
+          </div>
+          <button onClick={() => setLoadError(null)}>关闭</button>
+        </div>
+      )}
+
+      {saveError && (
+        <div className="global-alert alert-error">
+          <div>
+            <strong>保存本地数据失败：</strong>
+            <span>{saveError}</span>
+          </div>
+          <button onClick={() => setSaveError(null)}>关闭</button>
+        </div>
+      )}
+
       <section className="hero">
         <div>
           <p className="eyebrow">{project.id} · port {project.port}</p>
           <h1>{project.title}</h1>
           <p className="subtitle">{project.subtitle}</p>
+          <div className="hero-meta-row">
+            {lastSavedText && <span className="save-status">{lastSavedText}</span>}
+            <button className="danger-link-btn" onClick={() => setShowClearConfirm(true)}>清空本地项目数据</button>
+          </div>
         </div>
         <div className="stack-card">
           <span>技术栈</span>
           <strong>{project.stack}</strong>
+          <div className="storage-info">
+            <span className="storage-badge">数据已自动保存至本地</span>
+          </div>
         </div>
       </section>
 
@@ -1714,6 +1812,35 @@ function App() {
               <button className="primary-action" onClick={handleCopySummary}>
                 {copySuccess ? "✓ 已复制" : "复制文本"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showClearConfirm && (
+        <div className="modal-overlay" onClick={() => setShowClearConfirm(false)}>
+          <div className="modal-content confirm-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>确认清空本地数据</h3>
+              <button className="modal-close" onClick={() => setShowClearConfirm(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="confirm-warning">
+                <p><strong>⚠️ 此操作不可撤销</strong></p>
+                <p>清空后将删除所有本地保存的：</p>
+                <ul>
+                  <li>钻孔记录（{records.length}条）</li>
+                  <li>地层分层数据</li>
+                  <li>标贯试验记录</li>
+                  <li>取样记录</li>
+                  <li>地下水位观测</li>
+                </ul>
+                <p>系统将自动恢复为示例种子数据。</p>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="secondary-btn" onClick={() => setShowClearConfirm(false)}>取消</button>
+              <button className="danger-btn danger-btn-large" onClick={handleClearData}>确认清空</button>
             </div>
           </div>
         </div>
