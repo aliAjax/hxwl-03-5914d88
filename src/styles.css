@@ -2121,3 +2121,966 @@ button:disabled:hover {
   filter: none !important;
   box-shadow: none !important;
 }
+
+.borehole-chart-container {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--border);
+}
+
+.chart-title h3 {
+  margin: 0 0 4px 0;
+  font-size: 18px;
+  color: #172033;
+}
+
+.chart-subtitle {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.print-btn {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+  font-size: 13px;
+}
+
+.print-btn:hover {
+  background: #0d655e;
+  border-color: #0d655e;
+}
+
+.data-issues {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.data-issues.has-critical-errors {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.issues-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.issues-header strong {
+  color: #92400e;
+  font-size: 14px;
+}
+
+.has-critical-errors .issues-header strong {
+  color: #b91c1c;
+}
+
+.issue-count {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.error-count {
+  background: #fee2e2;
+  color: #dc2626;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.warning-count {
+  background: #fef3c7;
+  color: #d97706;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.issues-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px 0;
+}
+
+.issue-item {
+  display: flex;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.issue-item:last-child {
+  border-bottom: none;
+}
+
+.issue-icon {
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.issue-text {
+  color: #78350f;
+}
+
+.issue-error .issue-text {
+  color: #991b1b;
+}
+
+.issues-footer {
+  padding-top: 12px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.1);
+}
+
+.issues-footer p {
+  margin: 0;
+  color: #991b1b;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.chart-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #94a3b8;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.chart-wrapper {
+  position: relative;
+}
+
+.borehole-chart {
+  position: relative;
+  display: flex;
+  min-height: 600px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.chart-scale {
+  position: relative;
+  width: 60px;
+  flex-shrink: 0;
+  background: #f8fafc;
+  border-right: 2px solid var(--border);
+}
+
+.scale-title {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+  border-bottom: 2px solid var(--border);
+  background: #f1f5f9;
+}
+
+.scale-tick {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+}
+
+.scale-tick.major .tick-label {
+  font-weight: 600;
+  color: #172033;
+  font-size: 12px;
+}
+
+.scale-tick.minor .tick-label {
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.tick-label {
+  width: 44px;
+  text-align: right;
+  padding-right: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tick-line {
+  flex: 1;
+  height: 1px;
+  background: #cbd5e1;
+}
+
+.scale-tick.major .tick-line {
+  height: 2px;
+  background: #94a3b8;
+}
+
+.chart-columns {
+  flex: 1;
+  display: flex;
+  overflow-x: auto;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  min-width: 100px;
+  border-right: 1px solid var(--border);
+}
+
+.column:last-child {
+  border-right: none;
+}
+
+.column-depth {
+  min-width: 90px;
+}
+
+.column-lithology {
+  min-width: 140px;
+  flex-shrink: 0;
+}
+
+.column-spt {
+  min-width: 120px;
+}
+
+.column-description {
+  flex: 1;
+  min-width: 180px;
+}
+
+.column .column-header {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  background: #f1f5f9;
+  border-bottom: 2px solid var(--border);
+  padding: 0 8px;
+  text-align: center;
+}
+
+.column-body {
+  position: relative;
+  flex: 1;
+  background: linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%);
+}
+
+.depth-cell {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fbfdff;
+  transition: all 0.15s ease;
+}
+
+.depth-cell.expanded {
+  background: linear-gradient(to bottom, #fff7ed 0%, #ffedd5 100%);
+}
+
+.depth-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #172033;
+  font-variant-numeric: tabular-nums;
+}
+
+.thickness-value {
+  font-size: 10px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.lithology-cell {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  border: 2px solid rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  transition: all 0.15s ease;
+}
+
+.lithology-cell.expanded {
+  border-style: dashed;
+  border-color: #f59e0b;
+}
+
+.lithology-pattern {
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.1) 2px,
+    transparent 2px,
+    transparent 6px
+  );
+  opacity: 0.5;
+}
+
+.lithology-label {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.lithology-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.85);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+  line-height: 1.3;
+}
+
+.lithology-density,
+.lithology-color {
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.7);
+  font-weight: 500;
+}
+
+.expanded-indicator {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 10px;
+  color: #dc2626;
+  font-weight: 700;
+  z-index: 3;
+}
+
+.water-level-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #2563eb;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.water-level-line::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  background: repeating-linear-gradient(
+    90deg,
+    #2563eb 0,
+    #2563eb 6px,
+    transparent 6px,
+    transparent 10px
+  );
+}
+
+.water-level-label {
+  position: absolute;
+  right: 4px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  transform: translateY(-50%);
+}
+
+.water-level-symbol {
+  position: absolute;
+  left: -8px;
+  color: #2563eb;
+  font-size: 14px;
+  transform: translateY(-50%);
+}
+
+.spt-marker {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  background: #ffffff;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  transform: translateY(-50%);
+  z-index: 5;
+  transition: all 0.15s ease;
+}
+
+.spt-marker::before {
+  content: "◆";
+  color: var(--accent);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.spt-marker.abnormal {
+  border-color: #e11d48;
+  background: #fef2f2;
+}
+
+.spt-marker.abnormal::before {
+  color: #e11d48;
+}
+
+.spt-depth {
+  font-size: 10px;
+  font-weight: 600;
+  color: #475569;
+  font-variant-numeric: tabular-nums;
+}
+
+.spt-blow {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.spt-blow.abnormal {
+  color: #e11d48;
+  text-decoration: line-through;
+}
+
+.spt-abnormal-badge {
+  margin-left: auto;
+  font-size: 9px;
+  font-weight: 700;
+  color: #ffffff;
+  background: #e11d48;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+.description-cell {
+  position: absolute;
+  left: 0;
+  right: 0;
+  padding: 6px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.description-cell.expanded {
+  background: linear-gradient(to bottom, #fff7ed 0%, #ffedd5 100%);
+}
+
+.description-layer-index {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 2px;
+}
+
+.description-text {
+  font-size: 11px;
+  color: #475569;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 16px;
+  margin-top: 12px;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+.legend-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.legend-items {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.legend-symbol {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.water-symbol {
+  color: #2563eb;
+}
+
+.spt-symbol {
+  color: var(--accent);
+}
+
+.abnormal-symbol {
+  color: #e11d48;
+}
+
+.expanded-symbol {
+  color: #f59e0b;
+}
+
+.water-level-info {
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #1e40af;
+  line-height: 1.8;
+}
+
+.water-level-info strong {
+  color: #1e3a8a;
+}
+
+.water-level-info span {
+  margin-right: 8px;
+}
+
+@media (max-width: 960px) {
+  .borehole-chart-container {
+    padding: 14px;
+  }
+
+  .chart-header {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .chart-actions {
+    width: 100%;
+  }
+
+  .print-btn {
+    width: 100%;
+  }
+
+  .column-depth {
+    min-width: 70px;
+  }
+
+  .column-lithology {
+    min-width: 110px;
+  }
+
+  .column-spt {
+    min-width: 100px;
+  }
+
+  .column-description {
+    min-width: 140px;
+  }
+
+  .depth-value {
+    font-size: 11px;
+  }
+
+  .lithology-name {
+    font-size: 11px;
+  }
+
+  .spt-depth,
+  .spt-blow {
+    font-size: 10px;
+  }
+
+  .chart-legend {
+    gap: 12px;
+  }
+
+  .legend-items {
+    gap: 12px;
+  }
+
+  .chart-scale {
+    width: 48px;
+  }
+
+  .tick-label {
+    width: 34px;
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 640px) {
+  .borehole-chart-container {
+    padding: 10px;
+  }
+
+  .issues-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .column .column-header {
+    font-size: 10px;
+    padding: 0 4px;
+  }
+
+  .column-depth {
+    min-width: 60px;
+  }
+
+  .column-lithology {
+    min-width: 90px;
+  }
+
+  .column-spt {
+    min-width: 85px;
+  }
+
+  .column-description {
+    min-width: 120px;
+  }
+
+  .water-level-label {
+    font-size: 9px;
+    padding: 2px 6px;
+  }
+
+  .spt-marker {
+    padding: 2px 4px;
+    gap: 3px;
+  }
+
+  .spt-depth {
+    font-size: 9px;
+  }
+
+  .spt-blow {
+    font-size: 10px;
+  }
+
+  .spt-abnormal-badge {
+    display: none;
+  }
+
+  .description-text {
+    font-size: 10px;
+    -webkit-line-clamp: 2;
+  }
+
+  .chart-legend {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .legend-items {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .water-level-info {
+    font-size: 11px;
+    padding: 10px 12px;
+  }
+
+  .water-level-info span {
+    display: block;
+    margin-right: 0;
+    margin-bottom: 4px;
+  }
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 15mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .app-shell > *:not(.borehole-chart-section),
+  .hero,
+  .metrics-grid,
+  .workspace,
+  .records-section,
+  .global-alert,
+  .loading-overlay,
+  .chart-actions,
+  .print-btn {
+    display: none !important;
+  }
+
+  .borehole-chart-container {
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .data-issues {
+    page-break-inside: avoid;
+    border: 1px solid #999 !important;
+    background: #fff !important;
+  }
+
+  .issues-header {
+    border-bottom: 1px solid #ccc !important;
+  }
+
+  .chart-header {
+    border-bottom: 2px solid #333 !important;
+    padding-bottom: 8px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .chart-title h3 {
+    font-size: 16px !important;
+  }
+
+  .borehole-chart {
+    border: 1px solid #333 !important;
+    page-break-inside: avoid;
+  }
+
+  .chart-scale {
+    background: #f5f5f5 !important;
+  }
+
+  .scale-title,
+  .column .column-header {
+    background: #e5e5e5 !important;
+    border-bottom: 1px solid #333 !important;
+  }
+
+  .lithology-cell {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .water-level-line {
+    background: #2563eb !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .water-level-label {
+    background: #2563eb !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .spt-marker {
+    border: 1px solid #333 !important;
+    background: #fff !important;
+  }
+
+  .spt-marker.abnormal {
+    border: 1px solid #e11d48 !important;
+    background: #fff5f5 !important;
+  }
+
+  .spt-blow {
+    color: #333 !important;
+  }
+
+  .spt-blow.abnormal {
+    color: #e11d48 !important;
+  }
+
+  .chart-legend {
+    page-break-inside: avoid;
+    border: 1px solid #ccc !important;
+    background: #fafafa !important;
+    margin-top: 8px !important;
+  }
+
+  .water-level-info {
+    page-break-inside: avoid;
+    border: 1px solid #93c5fd !important;
+    background: #eff6ff !important;
+    margin-top: 8px !important;
+  }
+
+  .depth-cell,
+  .description-cell {
+    border-bottom: 1px solid #ccc !important;
+  }
+
+  .depth-cell.expanded,
+  .description-cell.expanded {
+    background: #fff7ed !important;
+  }
+
+  .lithology-cell.expanded {
+    border-color: #f59e0b !important;
+  }
+
+  .column {
+    border-right: 1px solid #ccc !important;
+  }
+
+  .chart-scale {
+    border-right: 1px solid #333 !important;
+  }
+
+  .expanded-indicator {
+    color: #dc2626 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .tick-line {
+    background: #999 !important;
+  }
+
+  .scale-tick.major .tick-line {
+    background: #666 !important;
+  }
+
+  .spt-abnormal-badge {
+    background: #e11d48 !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .lithology-label {
+    text-shadow: none !important;
+  }
+
+  .lithology-pattern {
+    opacity: 0.3 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+@media print and (max-width: 768px) {
+  @page {
+    size: A4 landscape;
+  }
+}
+
+.borehole-chart-section {
+  margin-bottom: 20px;
+}
+
+.editor-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 2px solid var(--border);
+  padding: 0 2px;
+}
+
+.editor-tab {
+  padding: 10px 20px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: #64748b;
+  font-weight: 500;
+  font-size: 14px;
+  border-radius: 6px 6px 0 0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-bottom: -2px;
+}
+
+.editor-tab:hover {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.editor-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  background: #fffaf5;
+  font-weight: 600;
+}
+
+.editor-tab.active:hover {
+  background: #fffaf5;
+}
+
+@media (max-width: 640px) {
+  .editor-tabs {
+    overflow-x: auto;
+    padding-bottom: 0;
+  }
+
+  .editor-tab {
+    padding: 8px 14px;
+    font-size: 13px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}

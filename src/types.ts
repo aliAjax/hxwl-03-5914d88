@@ -72,6 +72,7 @@ export interface Permissions {
   canEditSampling: boolean;
   canEditWaterLevel: boolean;
   canExportSummary: boolean;
+  canViewChart: boolean;
   canClearData: boolean;
 }
 
@@ -87,6 +88,7 @@ export const rolePermissions: Record<Role, Permissions> = {
     canEditSampling: true,
     canEditWaterLevel: true,
     canExportSummary: true,
+    canViewChart: true,
     canClearData: true,
   },
   "岩土工程师": {
@@ -100,6 +102,7 @@ export const rolePermissions: Record<Role, Permissions> = {
     canEditSampling: false,
     canEditWaterLevel: false,
     canExportSummary: true,
+    canViewChart: true,
     canClearData: false,
   },
   "项目负责人": {
@@ -113,6 +116,7 @@ export const rolePermissions: Record<Role, Permissions> = {
     canEditSampling: false,
     canEditWaterLevel: false,
     canExportSummary: true,
+    canViewChart: true,
     canClearData: false,
   },
 };

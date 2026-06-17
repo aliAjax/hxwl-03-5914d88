@@ -14,6 +14,7 @@ import type {
 } from "./types";
 import { rolePermissions, roleDescriptions } from "./types";
 import { saveProjectData, loadProjectData, clearProjectData, type ProjectData } from "./db";
+import BoreholeChart from "./components/BoreholeChart";
 
 const lithologyOptions = ["黏土", "粉质黏土", "粉土", "粉砂", "细砂", "中砂", "粗砂", "卵石", "圆砾", "强风化岩", "中风化岩", "微风化岩"];
 const soilColorOptions = ["褐黄色", "黄褐色", "灰黄色", "灰白色", "灰色", "灰褐色", "紫红色", "杂色"];
@@ -279,6 +280,7 @@ function App() {
   const [editingWaterLevelId, setEditingWaterLevelId] = useState<string | null>(null);
   const [waterLevelErrors, setWaterLevelErrors] = useState<Partial<Record<keyof WaterLevelRecord, string>>>({});
   const [waterLevelValidationMessage, setWaterLevelValidationMessage] = useState<string>("");
+  const [activeEditorTab, setActiveEditorTab] = useState<"editor" | "chart">("editor");
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -1496,18 +1498,45 @@ function App() {
           </div>
         </div>
 
-        <div className="panel layer-editor-panel">
+        <div className="panel layer-editor-panel borehole-chart-section">
           <div className="section-heading">
             <div>
               <p>地层分层</p>
               <h2>
-                {selectedBorehole ? `${selectedBorehole} · 分层编辑器` : "请选择钻孔"}
+                {selectedBorehole ? `${selectedBorehole} · ${activeEditorTab === "editor" ? "分层编辑器" : "柱状图"}` : "请选择钻孔"}
                 {selectedRecord && <span className="hole-depth-tag">孔深 {selectedRecord["孔深"]}m</span>}
               </h2>
             </div>
           </div>
 
           {selectedBorehole ? (
+            <>
+              <div className="editor-tabs">
+                <button
+                  className={`editor-tab ${activeEditorTab === "editor" ? "active" : ""}`}
+                  onClick={() => setActiveEditorTab("editor")}
+                >
+                  📝 数据编辑
+                </button>
+                <button
+                  className={`editor-tab ${activeEditorTab === "chart" ? "active" : ""} ${!permissions.canViewChart ? "btn-disabled" : ""}`}
+                  onClick={() => permissions.canViewChart && setActiveEditorTab("chart")}
+                  disabled={!permissions.canViewChart}
+                  title={!permissions.canViewChart ? "当前角色无查看柱状图权限" : ""}
+                >
+                  📊 钻孔柱状图
+                </button>
+              </div>
+
+              {activeEditorTab === "chart" ? (
+                <BoreholeChart
+                  boreholeId={selectedBorehole}
+                  holeDepth={holeDepth}
+                  layers={sortedLayers}
+                  sptRecords={sortedSPTRecords}
+                  waterLevelRecords={sortedWaterLevelRecords}
+                />
+              ) : (
             <div className="layer-editor-container">
               <div className="stratum-column">
                 <div className="column-header"><span>深度(m)</span></div>
@@ -1618,6 +1647,7 @@ function App() {
                     </div>
                   </>
                 )}
+              </div>
 
                 <div className="layer-list-section">
                   <h4>分层列表</h4>
@@ -1966,7 +1996,8 @@ function App() {
                   </div>
                 </div>
               </div>
-            </div>
+              )}
+            </>
           ) : (
             <div className="layer-editor-empty">
               <p>请从左侧选择一个钻孔以查看和编辑地层分层</p>
