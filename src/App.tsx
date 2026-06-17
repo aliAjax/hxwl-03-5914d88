@@ -10,7 +10,9 @@ import type {
   WaterLevelRecord,
   BoreholeWaterLevelRecords,
   DrillingRecord,
+  Role,
 } from "./types";
+import { rolePermissions, roleDescriptions } from "./types";
 import { saveProjectData, loadProjectData, clearProjectData, type ProjectData } from "./db";
 
 const lithologyOptions = ["黏土", "粉质黏土", "粉土", "粉砂", "细砂", "中砂", "粗砂", "卵石", "圆砾", "强风化岩", "中风化岩", "微风化岩"];
@@ -240,6 +242,9 @@ const emptyWaterLevelForm: Omit<WaterLevelRecord, "id"> = {
 };
 
 function App() {
+  const [currentRole, setCurrentRole] = useState<Role>("现场编录员");
+  const permissions = useMemo(() => rolePermissions[currentRole], [currentRole]);
+
   const [formData, setFormData] = useState<DrillingRecord>(emptyForm);
   const [records, setRecords] = useState<DrillingRecord[]>([]);
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
@@ -1104,7 +1109,15 @@ function App() {
           <p className="subtitle">{project.subtitle}</p>
           <div className="hero-meta-row">
             {lastSavedText && <span className="save-status">{lastSavedText}</span>}
-            <button className="danger-link-btn" onClick={() => setShowClearConfirm(true)}>清空本地项目数据</button>
+            <span className="current-role-badge">当前角色：<strong>{currentRole}</strong></span>
+            <button
+              className={`danger-link-btn ${!permissions.canClearData ? "btn-disabled" : ""}`}
+              onClick={permissions.canClearData ? () => setShowClearConfirm(true) : undefined}
+              disabled={!permissions.canClearData}
+              title={!permissions.canClearData ? "当前角色无清空数据权限" : ""}
+            >
+              {permissions.canClearData ? "清空本地项目数据" : "无权限清空"}
+            </button>
           </div>
         </div>
         <div className="stack-card">
@@ -1124,11 +1137,22 @@ function App() {
 
       <section className="workspace">
         <aside className="panel narrow">
-          <h2>角色</h2>
-          <div className="chips">
-            {project.users.map((user: string) => (
-              <span key={user}>{user}</span>
+          <h2>角色切换</h2>
+          <div className="chips role-chips">
+            {(project.users as Role[]).map((user: Role) => (
+              <button
+                key={user}
+                className={currentRole === user ? "role-active" : ""}
+                onClick={() => setCurrentRole(user)}
+                title={roleDescriptions[user]}
+              >
+                {user}
+              </button>
             ))}
+          </div>
+          <div className="role-description">
+            <span className="role-icon">🔒</span>
+            <p>{roleDescriptions[currentRole]}</p>
           </div>
           <h2>现场筛选</h2>
           <div className="chips filter-chips">
@@ -1146,24 +1170,39 @@ function App() {
               <p>{project.domain}</p>
               <h2>新增钻孔</h2>
             </div>
-            <button className="primary-action" onClick={handleAddRecord}>新增记录</button>
+            <button
+              className={`primary-action ${!permissions.canAddRecord ? "btn-disabled" : ""}`}
+              onClick={permissions.canAddRecord ? handleAddRecord : undefined}
+              disabled={!permissions.canAddRecord}
+              title={!permissions.canAddRecord ? "当前角色无新增钻孔权限" : ""}
+            >
+              {permissions.canAddRecord ? "新增记录" : "无权限新增"}
+            </button>
           </div>
-          <div className="field-grid">
-            {project.fields.map((field: FieldName) => (
-              <label key={field}>
-                <span>{field}</span>
-                {field === "岩性分类" ? (
-                  <select className={errors[field] ? "input-error" : ""} value={formData[field]} onChange={(e) => handleInputChange(field, e.target.value)}>
-                    <option value="">选择岩性分类</option>
-                    {project.filters.map((f: string) => (<option key={f} value={f}>{f}</option>))}
-                  </select>
-                ) : (
-                  <input className={errors[field] ? "input-error" : ""} placeholder={"填写" + field} value={formData[field]} onChange={(e) => handleInputChange(field, e.target.value)} />
-                )}
-                {errors[field] && <em className="error-tip">{errors[field]}</em>}
-              </label>
-            ))}
-          </div>
+          {!permissions.canAddRecord ? (
+            <div className="permission-empty-state">
+              <span className="empty-lock-icon">🔐</span>
+              <h4>新增钻孔功能受限</h4>
+              <p>当前角色为「{currentRole}」，仅「现场编录员」可新增钻孔记录</p>
+            </div>
+          ) : (
+            <div className="field-grid">
+              {project.fields.map((field: FieldName) => (
+                <label key={field}>
+                  <span>{field}</span>
+                  {field === "岩性分类" ? (
+                    <select className={errors[field] ? "input-error" : ""} value={formData[field]} onChange={(e) => handleInputChange(field, e.target.value)}>
+                      <option value="">选择岩性分类</option>
+                      {project.filters.map((f: string) => (<option key={f} value={f}>{f}</option>))}
+                    </select>
+                  ) : (
+                    <input className={errors[field] ? "input-error" : ""} placeholder={"填写" + field} value={formData[field]} onChange={(e) => handleInputChange(field, e.target.value)} />
+                  )}
+                  {errors[field] && <em className="error-tip">{errors[field]}</em>}
+                </label>
+              ))}
+            </div>
+          )}
 
           {selectedBorehole && selectedRecord && (
             <div className="quick-overview">
@@ -1271,7 +1310,14 @@ function App() {
               <p>钻孔数据</p>
               <h2>选择钻孔</h2>
             </div>
-            <button onClick={() => setShowPreview(true)}>导出摘要</button>
+            <button
+              className={`${!permissions.canExportSummary ? "btn-disabled" : ""}`}
+              onClick={permissions.canExportSummary ? () => setShowPreview(true) : undefined}
+              disabled={!permissions.canExportSummary}
+              title={!permissions.canExportSummary ? "当前角色无导出权限" : ""}
+            >
+              {permissions.canExportSummary ? "导出摘要" : "无权限导出"}
+            </button>
           </div>
           <div className="borehole-list">
             {filteredRecords.map((record, index: number) => {
@@ -1315,14 +1361,20 @@ function App() {
                       const topPercent = (start / holeDepth) * 100;
                       const heightPercent = (thickness / holeDepth) * 100;
                       return (
-                        <div key={layer.id} className={`stratum-layer litho-${idx % 6}`} style={{ top: `${topPercent}%`, height: `${heightPercent}%` }} onClick={() => handleEditLayer(layer)}>
+                        <div
+                          key={layer.id}
+                          className={`stratum-layer litho-${idx % 6} ${!permissions.canEditLayer ? "layer-readonly" : ""}`}
+                          style={{ top: `${topPercent}%`, height: `${heightPercent}%` }}
+                          onClick={permissions.canEditLayer ? () => handleEditLayer(layer) : undefined}
+                          title={!permissions.canEditLayer ? "当前角色无分层编辑权限" : "点击编辑该层"}
+                        >
                           <span className="layer-depth-top">{layer.startDepth}</span>
                           <span className="layer-name">{layer.lithology}</span>
                           <span className="layer-depth-bottom">{layer.endDepth}</span>
                         </div>
                       );
                     })
-                  ) : (<div className="column-empty">暂无分层数据</div>)}
+                  ) : (<div className="column-empty">{permissions.canEditLayer ? "暂无分层数据" : "暂无分层数据（仅查看）"}</div>)}
                   <div className="column-scale">
                     {[0, 25, 50, 75, 100].map(pct => (<span key={pct} style={{ top: `${pct}%` }}>{((holeDepth * pct) / 100).toFixed(1)}</span>))}
                   </div>
@@ -1368,20 +1420,42 @@ function App() {
               </div>
 
               <div className="layer-form-section">
-                <h3>{editingLayerId ? "编辑分层" : "新增分层"}</h3>
-                <div className="layer-form-grid">
-                  <label><span>起始深度 (m)</span><input type="number" step="0.1" className={layerErrors.startDepth ? "input-error" : ""} placeholder="起始深度" value={layerForm.startDepth} onChange={(e) => handleLayerInputChange("startDepth", e.target.value)} />{layerErrors.startDepth && <em className="error-tip">{layerErrors.startDepth}</em>}</label>
-                  <label><span>终止深度 (m)</span><input type="number" step="0.1" className={layerErrors.endDepth ? "input-error" : ""} placeholder="终止深度" value={layerForm.endDepth} onChange={(e) => handleLayerInputChange("endDepth", e.target.value)} />{layerErrors.endDepth && <em className="error-tip">{layerErrors.endDepth}</em>}</label>
-                  <label><span>岩性</span><select className={layerErrors.lithology ? "input-error" : ""} value={layerForm.lithology} onChange={(e) => handleLayerInputChange("lithology", e.target.value)}><option value="">选择岩性</option>{lithologyOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select>{layerErrors.lithology && <em className="error-tip">{layerErrors.lithology}</em>}</label>
-                  <label><span>土色</span><select className={layerErrors.soilColor ? "input-error" : ""} value={layerForm.soilColor} onChange={(e) => handleLayerInputChange("soilColor", e.target.value)}><option value="">选择土色</option>{soilColorOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select>{layerErrors.soilColor && <em className="error-tip">{layerErrors.soilColor}</em>}</label>
-                  <label><span>密实度/状态</span><select className={layerErrors.density ? "input-error" : ""} value={layerForm.density} onChange={(e) => handleLayerInputChange("density", e.target.value)}><option value="">选择密实度/状态</option>{densityOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select>{layerErrors.density && <em className="error-tip">{layerErrors.density}</em>}</label>
-                  <label className="full-width"><span>描述</span><input placeholder="分层描述" value={layerForm.description} onChange={(e) => handleLayerInputChange("description", e.target.value)} /></label>
-                </div>
-                {layerValidationMessage && (<div className="layer-validation-error">{layerValidationMessage}</div>)}
-                {gapMessage && sortedLayers.length > 0 && (<div className="layer-gap-warning">{gapMessage}</div>)}
-                <div className="layer-form-actions">
-                  {editingLayerId ? (<><button className="secondary-btn" onClick={handleCancelEdit}>取消</button><button className="primary-action" onClick={handleUpdateLayer}>更新分层</button></>) : (<button className="primary-action" onClick={handleAddLayer}>添加分层</button>)}
-                </div>
+                <h3>
+                  {editingLayerId ? (permissions.canCheckLayer ? "校核分层" : "编辑分层") : "新增分层"}
+                  {permissions.canCheckLayer && permissions.canEditLayer && currentRole === "岩土工程师" && <span className="check-badge">校核模式</span>}
+                </h3>
+                {!permissions.canEditLayer ? (
+                  <div className="permission-empty-state">
+                    <span className="empty-lock-icon">🔐</span>
+                    <h4>分层编辑功能受限</h4>
+                    <p>当前角色为「{currentRole}」，{permissions.canCheckLayer ? "可校核分层数据" : "仅可查看看板数据"}</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="layer-form-grid">
+                      <label><span>起始深度 (m)</span><input type="number" step="0.1" className={layerErrors.startDepth ? "input-error" : ""} placeholder="起始深度" value={layerForm.startDepth} onChange={(e) => handleLayerInputChange("startDepth", e.target.value)} />{layerErrors.startDepth && <em className="error-tip">{layerErrors.startDepth}</em>}</label>
+                      <label><span>终止深度 (m)</span><input type="number" step="0.1" className={layerErrors.endDepth ? "input-error" : ""} placeholder="终止深度" value={layerForm.endDepth} onChange={(e) => handleLayerInputChange("endDepth", e.target.value)} />{layerErrors.endDepth && <em className="error-tip">{layerErrors.endDepth}</em>}</label>
+                      <label><span>岩性</span><select className={layerErrors.lithology ? "input-error" : ""} value={layerForm.lithology} onChange={(e) => handleLayerInputChange("lithology", e.target.value)}><option value="">选择岩性</option>{lithologyOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select>{layerErrors.lithology && <em className="error-tip">{layerErrors.lithology}</em>}</label>
+                      <label><span>土色</span><select className={layerErrors.soilColor ? "input-error" : ""} value={layerForm.soilColor} onChange={(e) => handleLayerInputChange("soilColor", e.target.value)}><option value="">选择土色</option>{soilColorOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select>{layerErrors.soilColor && <em className="error-tip">{layerErrors.soilColor}</em>}</label>
+                      <label><span>密实度/状态</span><select className={layerErrors.density ? "input-error" : ""} value={layerForm.density} onChange={(e) => handleLayerInputChange("density", e.target.value)}><option value="">选择密实度/状态</option>{densityOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select>{layerErrors.density && <em className="error-tip">{layerErrors.density}</em>}</label>
+                      <label className="full-width"><span>描述</span><input placeholder="分层描述" value={layerForm.description} onChange={(e) => handleLayerInputChange("description", e.target.value)} /></label>
+                    </div>
+                    {layerValidationMessage && (<div className="layer-validation-error">{layerValidationMessage}</div>)}
+                    {gapMessage && sortedLayers.length > 0 && (<div className="layer-gap-warning">{gapMessage}</div>)}
+                    <div className="layer-form-actions">
+                      {editingLayerId ? (
+                        <>
+                          <button className="secondary-btn" onClick={handleCancelEdit}>取消</button>
+                          <button className="primary-action" onClick={handleUpdateLayer}>
+                            {permissions.canCheckLayer && currentRole === "岩土工程师" ? "确认校核" : "更新分层"}
+                          </button>
+                        </>
+                      ) : (
+                        <button className="primary-action" onClick={handleAddLayer}>添加分层</button>
+                      )}
+                    </div>
+                  </>
+                )}
 
                 <div className="layer-list-section">
                   <h4>分层列表</h4>
@@ -1397,10 +1471,27 @@ function App() {
                             <td>{layer.soilColor}</td>
                             <td>{layer.density}</td>
                             <td className="layer-desc-cell">{layer.description}</td>
-                            <td><button className="small-btn" onClick={() => handleEditLayer(layer)}>编辑</button><button className="small-btn danger-btn" onClick={() => handleDeleteLayer(layer.id)}>删除</button></td>
+                            <td>
+                              <button
+                                className={`small-btn ${!permissions.canEditLayer ? "btn-disabled" : ""}`}
+                                onClick={permissions.canEditLayer ? () => handleEditLayer(layer) : undefined}
+                                disabled={!permissions.canEditLayer}
+                                title={!permissions.canEditLayer ? "当前角色无编辑权限" : ""}
+                              >
+                                {permissions.canCheckLayer && currentRole === "岩土工程师" ? "校核" : "编辑"}
+                              </button>
+                              <button
+                                className={`small-btn danger-btn ${!permissions.canEditLayer ? "btn-disabled" : ""}`}
+                                onClick={permissions.canEditLayer ? () => handleDeleteLayer(layer.id) : undefined}
+                                disabled={!permissions.canEditLayer}
+                                title={!permissions.canEditLayer ? "当前角色无删除权限" : ""}
+                              >
+                                删除
+                              </button>
+                            </td>
                           </tr>
                         ))}
-                        {sortedLayers.length === 0 && (<tr><td colSpan={7} className="empty-row">暂无分层数据，请添加</td></tr>)}
+                        {sortedLayers.length === 0 && (<tr><td colSpan={7} className="empty-row">{permissions.canEditLayer ? "暂无分层数据，请添加" : "暂无分层数据（仅查看）"}</td></tr>)}
                       </tbody>
                     </table>
                   </div>
@@ -1413,17 +1504,37 @@ function App() {
                     <div className="spt-stat-card"><span>异常点数</span><strong className={sptStats.abnormalCount > 0 ? "abnormal-count" : ""}>{sptStats.abnormalCount}个</strong><em>需复核</em></div>
                   </div>
                   <div className="spt-form-section">
-                    <h4>{editingSPTId ? "编辑标贯记录" : "新增标贯记录"}</h4>
-                    <div className="spt-form-grid">
-                      <label><span>试验深度 (m)</span><input type="number" step="0.1" className={sptErrors.depth ? "input-error" : ""} placeholder="标贯试验深度" value={sptForm.depth} onChange={(e) => handleSPTInputChange("depth", e.target.value)} />{sptErrors.depth && <em className="error-tip">{sptErrors.depth}</em>}</label>
-                      <label><span>标贯击数</span><input type="number" step="1" className={sptErrors.blowCount ? "input-error" : ""} placeholder="击数" value={sptForm.blowCount} onChange={(e) => handleSPTInputChange("blowCount", e.target.value)} />{sptErrors.blowCount && <em className="error-tip">{sptErrors.blowCount}</em>}</label>
-                      <label className="checkbox-label"><span>是否异常</span><div className="checkbox-wrapper"><input type="checkbox" checked={sptForm.isAbnormal} onChange={(e) => handleSPTInputChange("isAbnormal", e.target.checked)} /><span className="checkbox-text">{sptForm.isAbnormal ? "是（需复核）" : "否（正常）"}</span></div></label>
-                      <label className="full-width"><span>备注</span><input placeholder="异常原因或其他说明" value={sptForm.remark} onChange={(e) => handleSPTInputChange("remark", e.target.value)} /></label>
-                    </div>
-                    {sptValidationMessage && (<div className="spt-validation-error">{sptValidationMessage}</div>)}
-                    <div className="spt-form-actions">
-                      {editingSPTId ? (<><button className="secondary-btn" onClick={handleCancelSPTEdit}>取消</button><button className="primary-action" onClick={handleUpdateSPTRecord}>更新记录</button></>) : (<button className="primary-action" onClick={handleAddSPTRecord}>添加标贯记录</button>)}
-                    </div>
+                    <h4>
+                      {editingSPTId ? (permissions.canCheckSPT ? "校核标贯记录" : "编辑标贯记录") : "新增标贯记录"}
+                      {permissions.canCheckSPT && permissions.canEditSPT && currentRole === "岩土工程师" && <span className="check-badge">校核模式</span>}
+                    </h4>
+                    {!permissions.canEditSPT ? (
+                      <div className="permission-empty-state">
+                        <span className="empty-lock-icon">🔐</span>
+                        <h4>标贯编辑功能受限</h4>
+                        <p>当前角色为「{currentRole}」，仅「现场编录员」可新增标贯记录，「岩土工程师」可校核数据</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="spt-form-grid">
+                          <label><span>试验深度 (m)</span><input type="number" step="0.1" className={sptErrors.depth ? "input-error" : ""} placeholder="标贯试验深度" value={sptForm.depth} onChange={(e) => handleSPTInputChange("depth", e.target.value)} />{sptErrors.depth && <em className="error-tip">{sptErrors.depth}</em>}</label>
+                          <label><span>标贯击数</span><input type="number" step="1" className={sptErrors.blowCount ? "input-error" : ""} placeholder="击数" value={sptForm.blowCount} onChange={(e) => handleSPTInputChange("blowCount", e.target.value)} />{sptErrors.blowCount && <em className="error-tip">{sptErrors.blowCount}</em>}</label>
+                          <label className="checkbox-label"><span>是否异常</span><div className="checkbox-wrapper"><input type="checkbox" checked={sptForm.isAbnormal} onChange={(e) => handleSPTInputChange("isAbnormal", e.target.checked)} /><span className="checkbox-text">{sptForm.isAbnormal ? "是（需复核）" : "否（正常）"}</span></div></label>
+                          <label className="full-width"><span>备注</span><input placeholder="异常原因或其他说明" value={sptForm.remark} onChange={(e) => handleSPTInputChange("remark", e.target.value)} /></label>
+                        </div>
+                        {sptValidationMessage && (<div className="spt-validation-error">{sptValidationMessage}</div>)}
+                        <div className="spt-form-actions">
+                          {editingSPTId ? (
+                            <>
+                              <button className="secondary-btn" onClick={handleCancelSPTEdit}>取消</button>
+                              <button className="primary-action" onClick={handleUpdateSPTRecord}>
+                                {permissions.canCheckSPT && currentRole === "岩土工程师" ? "确认校核" : "更新记录"}
+                              </button>
+                            </>
+                          ) : (<button className="primary-action" onClick={handleAddSPTRecord}>添加标贯记录</button>)}
+                        </div>
+                      </>
+                    )}
                   </div>
                   <div className="spt-list-section">
                     <h4>标贯记录列表</h4>
@@ -1439,10 +1550,27 @@ function App() {
                               <td><span className="tag">{getLayerLithology(record.layerId)}</span></td>
                               <td>{record.isAbnormal ? <span className="status-badge status-abnormal">异常</span> : <span className="status-badge status-normal">正常</span>}</td>
                               <td className="spt-remark-cell">{record.remark || "-"}</td>
-                              <td><button className="small-btn" onClick={() => handleEditSPTRecord(record)}>编辑</button><button className="small-btn danger-btn" onClick={() => handleDeleteSPTRecord(record.id)}>删除</button></td>
+                              <td>
+                                <button
+                                  className={`small-btn ${!permissions.canEditSPT ? "btn-disabled" : ""}`}
+                                  onClick={permissions.canEditSPT ? () => handleEditSPTRecord(record) : undefined}
+                                  disabled={!permissions.canEditSPT}
+                                  title={!permissions.canEditSPT ? "当前角色无编辑权限" : ""}
+                                >
+                                  {permissions.canCheckSPT && currentRole === "岩土工程师" ? "校核" : "编辑"}
+                                </button>
+                                <button
+                                  className={`small-btn danger-btn ${!permissions.canEditSPT ? "btn-disabled" : ""}`}
+                                  onClick={permissions.canEditSPT ? () => handleDeleteSPTRecord(record.id) : undefined}
+                                  disabled={!permissions.canEditSPT}
+                                  title={!permissions.canEditSPT ? "当前角色无删除权限" : ""}
+                                >
+                                  删除
+                                </button>
+                              </td>
                             </tr>
                           ))}
-                          {sortedSPTRecords.length === 0 && (<tr><td colSpan={7} className="empty-row">暂无标贯记录，请添加</td></tr>)}
+                          {sortedSPTRecords.length === 0 && (<tr><td colSpan={7} className="empty-row">{permissions.canEditSPT ? "暂无标贯记录，请添加" : "暂无标贯记录（仅查看）"}</td></tr>)}
                         </tbody>
                       </table>
                     </div>
@@ -1458,16 +1586,26 @@ function App() {
                   </div>
                   <div className="spt-form-section">
                     <h4>{editingSamplingId ? "编辑取样记录" : "新增取样记录"}</h4>
-                    <div className="spt-form-grid">
-                      <label><span>取样深度 (m)</span><input type="number" step="0.1" className={samplingErrors.depth ? "input-error" : ""} placeholder="取样深度" value={samplingForm.depth} onChange={(e) => handleSamplingInputChange("depth", e.target.value)} />{samplingErrors.depth && <em className="error-tip">{samplingErrors.depth}</em>}</label>
-                      <label><span>取样类型</span><select className={samplingErrors.sampleType ? "input-error" : ""} value={samplingForm.sampleType} onChange={(e) => handleSamplingInputChange("sampleType", e.target.value)}><option value="">选择取样类型</option>{sampleTypeOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select>{samplingErrors.sampleType && <em className="error-tip">{samplingErrors.sampleType}</em>}</label>
-                      <label><span>样号</span><input className={samplingErrors.sampleNumber ? "input-error" : ""} placeholder="如 ZK18-1" value={samplingForm.sampleNumber} onChange={(e) => handleSamplingInputChange("sampleNumber", e.target.value)} />{samplingErrors.sampleNumber && <em className="error-tip">{samplingErrors.sampleNumber}</em>}</label>
-                      <label className="full-width"><span>备注</span><input placeholder="RQD或其他说明" value={samplingForm.remark} onChange={(e) => handleSamplingInputChange("remark", e.target.value)} /></label>
-                    </div>
-                    {samplingValidationMessage && (<div className="spt-validation-error">{samplingValidationMessage}</div>)}
-                    <div className="spt-form-actions">
-                      {editingSamplingId ? (<><button className="secondary-btn" onClick={handleCancelSamplingEdit}>取消</button><button className="primary-action" onClick={handleUpdateSamplingRecord}>更新取样</button></>) : (<button className="primary-action" onClick={handleAddSamplingRecord}>添加取样记录</button>)}
-                    </div>
+                    {!permissions.canEditSampling ? (
+                      <div className="permission-empty-state">
+                        <span className="empty-lock-icon">🔐</span>
+                        <h4>取样编辑功能受限</h4>
+                        <p>当前角色为「{currentRole}」，仅「现场编录员」可编辑取样记录</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="spt-form-grid">
+                          <label><span>取样深度 (m)</span><input type="number" step="0.1" className={samplingErrors.depth ? "input-error" : ""} placeholder="取样深度" value={samplingForm.depth} onChange={(e) => handleSamplingInputChange("depth", e.target.value)} />{samplingErrors.depth && <em className="error-tip">{samplingErrors.depth}</em>}</label>
+                          <label><span>取样类型</span><select className={samplingErrors.sampleType ? "input-error" : ""} value={samplingForm.sampleType} onChange={(e) => handleSamplingInputChange("sampleType", e.target.value)}><option value="">选择取样类型</option>{sampleTypeOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select>{samplingErrors.sampleType && <em className="error-tip">{samplingErrors.sampleType}</em>}</label>
+                          <label><span>样号</span><input className={samplingErrors.sampleNumber ? "input-error" : ""} placeholder="如 ZK18-1" value={samplingForm.sampleNumber} onChange={(e) => handleSamplingInputChange("sampleNumber", e.target.value)} />{samplingErrors.sampleNumber && <em className="error-tip">{samplingErrors.sampleNumber}</em>}</label>
+                          <label className="full-width"><span>备注</span><input placeholder="RQD或其他说明" value={samplingForm.remark} onChange={(e) => handleSamplingInputChange("remark", e.target.value)} /></label>
+                        </div>
+                        {samplingValidationMessage && (<div className="spt-validation-error">{samplingValidationMessage}</div>)}
+                        <div className="spt-form-actions">
+                          {editingSamplingId ? (<><button className="secondary-btn" onClick={handleCancelSamplingEdit}>取消</button><button className="primary-action" onClick={handleUpdateSamplingRecord}>更新取样</button></>) : (<button className="primary-action" onClick={handleAddSamplingRecord}>添加取样记录</button>)}
+                        </div>
+                      </>
+                    )}
                   </div>
                   <div className="spt-list-section">
                     <h4>取样记录列表</h4>
@@ -1483,10 +1621,27 @@ function App() {
                               <td>{record.sampleNumber}</td>
                               <td><span className="tag">{getLayerLithology(record.layerId)}</span></td>
                               <td className="spt-remark-cell">{record.remark || "-"}</td>
-                              <td><button className="small-btn" onClick={() => handleEditSamplingRecord(record)}>编辑</button><button className="small-btn danger-btn" onClick={() => handleDeleteSamplingRecord(record.id)}>删除</button></td>
+                              <td>
+                                <button
+                                  className={`small-btn ${!permissions.canEditSampling ? "btn-disabled" : ""}`}
+                                  onClick={permissions.canEditSampling ? () => handleEditSamplingRecord(record) : undefined}
+                                  disabled={!permissions.canEditSampling}
+                                  title={!permissions.canEditSampling ? "当前角色无编辑权限" : ""}
+                                >
+                                  编辑
+                                </button>
+                                <button
+                                  className={`small-btn danger-btn ${!permissions.canEditSampling ? "btn-disabled" : ""}`}
+                                  onClick={permissions.canEditSampling ? () => handleDeleteSamplingRecord(record.id) : undefined}
+                                  disabled={!permissions.canEditSampling}
+                                  title={!permissions.canEditSampling ? "当前角色无删除权限" : ""}
+                                >
+                                  删除
+                                </button>
+                              </td>
                             </tr>
                           ))}
-                          {sortedSamplingRecords.length === 0 && (<tr><td colSpan={7} className="empty-row">暂无取样记录，请添加</td></tr>)}
+                          {sortedSamplingRecords.length === 0 && (<tr><td colSpan={7} className="empty-row">{permissions.canEditSampling ? "暂无取样记录，请添加" : "暂无取样记录（仅查看）"}</td></tr>)}
                         </tbody>
                       </table>
                     </div>
@@ -1517,61 +1672,71 @@ function App() {
                   </div>
                   <div className="spt-form-section">
                     <h4>{editingWaterLevelId ? "编辑水位观测" : "新增水位观测"}</h4>
-                    <div className="spt-form-grid">
-                      <label>
-                        <span>初见水位 (m)</span>
-                        <input
-                          type="number"
-                          step="0.1"
-                          className={waterLevelErrors.firstSeenLevel ? "input-error" : ""}
-                          placeholder="初见水位埋深"
-                          value={waterLevelForm.firstSeenLevel}
-                          onChange={(e) => handleWaterLevelInputChange("firstSeenLevel", e.target.value)}
-                        />
-                        {waterLevelErrors.firstSeenLevel && <em className="error-tip">{waterLevelErrors.firstSeenLevel}</em>}
-                      </label>
-                      <label>
-                        <span>稳定水位 (m)</span>
-                        <input
-                          type="number"
-                          step="0.1"
-                          className={waterLevelErrors.stableLevel ? "input-error" : ""}
-                          placeholder="稳定后水位（可选）"
-                          value={waterLevelForm.stableLevel}
-                          onChange={(e) => handleWaterLevelInputChange("stableLevel", e.target.value)}
-                        />
-                        {waterLevelErrors.stableLevel && <em className="error-tip">{waterLevelErrors.stableLevel}</em>}
-                      </label>
-                      <label>
-                        <span>观测时间</span>
-                        <input
-                          type="datetime-local"
-                          className={waterLevelErrors.observationTime ? "input-error" : ""}
-                          value={waterLevelForm.observationTime.replace(" ", "T").slice(0, 16)}
-                          onChange={(e) => handleWaterLevelInputChange("observationTime", e.target.value.replace("T", " "))}
-                        />
-                        {waterLevelErrors.observationTime && <em className="error-tip">{waterLevelErrors.observationTime}</em>}
-                      </label>
-                      <label className="full-width">
-                        <span>天气/备注</span>
-                        <input
-                          placeholder="天气情况或其他备注"
-                          value={waterLevelForm.weatherRemark}
-                          onChange={(e) => handleWaterLevelInputChange("weatherRemark", e.target.value)}
-                        />
-                      </label>
-                    </div>
-                    {waterLevelValidationMessage && (<div className="spt-validation-error">{waterLevelValidationMessage}</div>)}
-                    <div className="spt-form-actions">
-                      {editingWaterLevelId ? (
-                        <>
-                          <button className="secondary-btn" onClick={handleCancelWaterLevelEdit}>取消</button>
-                          <button className="primary-action" onClick={handleUpdateWaterLevelRecord}>更新记录</button>
-                        </>
-                      ) : (
-                        <button className="primary-action" onClick={handleAddWaterLevelRecord}>添加水位观测</button>
-                      )}
-                    </div>
+                    {!permissions.canEditWaterLevel ? (
+                      <div className="permission-empty-state">
+                        <span className="empty-lock-icon">🔐</span>
+                        <h4>水位观测编辑功能受限</h4>
+                        <p>当前角色为「{currentRole}」，仅「现场编录员」可编辑水位观测记录</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="spt-form-grid">
+                          <label>
+                            <span>初见水位 (m)</span>
+                            <input
+                              type="number"
+                              step="0.1"
+                              className={waterLevelErrors.firstSeenLevel ? "input-error" : ""}
+                              placeholder="初见水位埋深"
+                              value={waterLevelForm.firstSeenLevel}
+                              onChange={(e) => handleWaterLevelInputChange("firstSeenLevel", e.target.value)}
+                            />
+                            {waterLevelErrors.firstSeenLevel && <em className="error-tip">{waterLevelErrors.firstSeenLevel}</em>}
+                          </label>
+                          <label>
+                            <span>稳定水位 (m)</span>
+                            <input
+                              type="number"
+                              step="0.1"
+                              className={waterLevelErrors.stableLevel ? "input-error" : ""}
+                              placeholder="稳定后水位（可选）"
+                              value={waterLevelForm.stableLevel}
+                              onChange={(e) => handleWaterLevelInputChange("stableLevel", e.target.value)}
+                            />
+                            {waterLevelErrors.stableLevel && <em className="error-tip">{waterLevelErrors.stableLevel}</em>}
+                          </label>
+                          <label>
+                            <span>观测时间</span>
+                            <input
+                              type="datetime-local"
+                              className={waterLevelErrors.observationTime ? "input-error" : ""}
+                              value={waterLevelForm.observationTime.replace(" ", "T").slice(0, 16)}
+                              onChange={(e) => handleWaterLevelInputChange("observationTime", e.target.value.replace("T", " "))}
+                            />
+                            {waterLevelErrors.observationTime && <em className="error-tip">{waterLevelErrors.observationTime}</em>}
+                          </label>
+                          <label className="full-width">
+                            <span>天气/备注</span>
+                            <input
+                              placeholder="天气情况或其他备注"
+                              value={waterLevelForm.weatherRemark}
+                              onChange={(e) => handleWaterLevelInputChange("weatherRemark", e.target.value)}
+                            />
+                          </label>
+                        </div>
+                        {waterLevelValidationMessage && (<div className="spt-validation-error">{waterLevelValidationMessage}</div>)}
+                        <div className="spt-form-actions">
+                          {editingWaterLevelId ? (
+                            <>
+                              <button className="secondary-btn" onClick={handleCancelWaterLevelEdit}>取消</button>
+                              <button className="primary-action" onClick={handleUpdateWaterLevelRecord}>更新记录</button>
+                            </>
+                          ) : (
+                            <button className="primary-action" onClick={handleAddWaterLevelRecord}>添加水位观测</button>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                   <div className="spt-list-section">
                     <h4>水位观测记录列表</h4>
@@ -1608,13 +1773,27 @@ function App() {
                               </td>
                               <td className="spt-remark-cell">{record.weatherRemark || "-"}</td>
                               <td>
-                                <button className="small-btn" onClick={() => handleEditWaterLevelRecord(record)}>编辑</button>
-                                <button className="small-btn danger-btn" onClick={() => handleDeleteWaterLevelRecord(record.id)}>删除</button>
+                                <button
+                                  className={`small-btn ${!permissions.canEditWaterLevel ? "btn-disabled" : ""}`}
+                                  onClick={permissions.canEditWaterLevel ? () => handleEditWaterLevelRecord(record) : undefined}
+                                  disabled={!permissions.canEditWaterLevel}
+                                  title={!permissions.canEditWaterLevel ? "当前角色无编辑权限" : ""}
+                                >
+                                  编辑
+                                </button>
+                                <button
+                                  className={`small-btn danger-btn ${!permissions.canEditWaterLevel ? "btn-disabled" : ""}`}
+                                  onClick={permissions.canEditWaterLevel ? () => handleDeleteWaterLevelRecord(record.id) : undefined}
+                                  disabled={!permissions.canEditWaterLevel}
+                                  title={!permissions.canEditWaterLevel ? "当前角色无删除权限" : ""}
+                                >
+                                  删除
+                                </button>
                               </td>
                             </tr>
                           ))}
                           {sortedWaterLevelRecords.length === 0 && (
-                            <tr><td colSpan={7} className="empty-row">暂无水位观测记录，请添加</td></tr>
+                            <tr><td colSpan={7} className="empty-row">{permissions.canEditWaterLevel ? "暂无水位观测记录，请添加" : "暂无水位观测记录（仅查看）"}</td></tr>
                           )}
                         </tbody>
                       </table>

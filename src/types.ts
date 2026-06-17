@@ -58,3 +58,67 @@ export interface DrillingRecord {
   "土色": string;
   "地下水位": string;
 }
+
+export type Role = "现场编录员" | "岩土工程师" | "项目负责人";
+
+export interface Permissions {
+  canAddRecord: boolean;
+  canEditRecord: boolean;
+  canDeleteRecord: boolean;
+  canEditLayer: boolean;
+  canCheckLayer: boolean;
+  canEditSPT: boolean;
+  canCheckSPT: boolean;
+  canEditSampling: boolean;
+  canEditWaterLevel: boolean;
+  canExportSummary: boolean;
+  canClearData: boolean;
+}
+
+export const rolePermissions: Record<Role, Permissions> = {
+  "现场编录员": {
+    canAddRecord: true,
+    canEditRecord: true,
+    canDeleteRecord: true,
+    canEditLayer: true,
+    canCheckLayer: false,
+    canEditSPT: true,
+    canCheckSPT: false,
+    canEditSampling: true,
+    canEditWaterLevel: true,
+    canExportSummary: true,
+    canClearData: true,
+  },
+  "岩土工程师": {
+    canAddRecord: false,
+    canEditRecord: false,
+    canDeleteRecord: false,
+    canEditLayer: true,
+    canCheckLayer: true,
+    canEditSPT: true,
+    canCheckSPT: true,
+    canEditSampling: false,
+    canEditWaterLevel: false,
+    canExportSummary: true,
+    canClearData: false,
+  },
+  "项目负责人": {
+    canAddRecord: false,
+    canEditRecord: false,
+    canDeleteRecord: false,
+    canEditLayer: false,
+    canCheckLayer: false,
+    canEditSPT: false,
+    canCheckSPT: false,
+    canEditSampling: false,
+    canEditWaterLevel: false,
+    canExportSummary: true,
+    canClearData: false,
+  },
+};
+
+export const roleDescriptions: Record<Role, string> = {
+  "现场编录员": "可新增和编辑所有记录",
+  "岩土工程师": "可校核分层和标贯数据",
+  "项目负责人": "仅查看看板和导出摘要",
+};
