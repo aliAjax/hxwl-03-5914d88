@@ -312,6 +312,7 @@ function App() {
     includeNew: true,
     includeOverwrite: true,
     includeConflict: false,
+    preserveChecked: true,
   });
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [showImportRecovery, setShowImportRecovery] = useState(false);
@@ -1249,6 +1250,7 @@ function App() {
         includeNew: preview.newCount > 0,
         includeOverwrite: preview.overwriteCount > 0,
         includeConflict: false,
+        preserveChecked: true,
       });
     } catch (err) {
       setImportError(err instanceof Error ? err.message : "文件解析失败");
@@ -1264,7 +1266,8 @@ function App() {
     setImportError("");
 
     try {
-      const result = await applyImport(importPreview, importOptions);
+      const progress = getImportProgress();
+      const result = await applyImport(importPreview, importOptions, progress);
       setImportResult(result);
 
       if (result.success) {
@@ -1279,6 +1282,7 @@ function App() {
             setSelectedBorehole(updatedData.records[0]["钻孔编号"]);
           }
         }
+        setShowImportRecovery(false);
       }
     } catch (err) {
       setImportError(err instanceof Error ? err.message : "导入失败");
@@ -1332,6 +1336,10 @@ function App() {
     clearImportProgress();
   }, []);
 
+  const handleResumeImport = useCallback(() => {
+    setShowArchiveImport(true);
+  }, []);
+
   useEffect(() => {
     const progress = getImportProgress();
     if (progress && progress.status === "interrupted") {
@@ -1380,9 +1388,12 @@ function App() {
         <div className="global-alert alert-warning">
           <div>
             <strong>⚠️ 检测到上次导入中断</strong>
-            <span>上次导入在处理 {interruptedImportInfo.current}/{interruptedImportInfo.total} 个钻孔时中断，建议重新导入归档文件以确保数据完整。</span>
+            <span>上次导入在处理 {interruptedImportInfo.current}/{interruptedImportInfo.total} 个钻孔时中断，已导入的数据已保存。点击「继续导入」从未完成处继续，或「清除记录」重新开始。</span>
           </div>
-          <button onClick={handleDismissRecovery}>知道了</button>
+          <div className="alert-actions">
+            <button onClick={handleResumeImport}>继续导入</button>
+            <button onClick={handleDismissRecovery}>清除记录</button>
+          </div>
         </div>
       )}
 
@@ -2539,7 +2550,43 @@ function App() {
                       <strong>{importPreview.unrecognizedCount}</strong>
                       <span>无法识别</span>
                     </div>
+                    {importPreview.duplicateInArchiveCount > 0 && (
+                      <div className="preview-stat stat-duplicate">
+                        <strong>{importPreview.duplicateInArchiveCount}</strong>
+                        <span>归档内重复</span>
+                      </div>
+                    )}
                   </div>
+
+                  {(importPreview.normalizationStats.totalChanges > 0 || importPreview.checkedBoreholeCount > 0) && (
+                    <div className="preview-info-panel">
+                      {importPreview.normalizationStats.totalChanges > 0 && (
+                        <div className="info-block">
+                          <h4>📐 深度单位归一化</h4>
+                          <div className="info-stats-row">
+                            <span>共 <strong>{importPreview.normalizationStats.totalChanges}</strong> 处调整</span>
+                            {importPreview.normalizationStats.unitConvertedCount > 0 && (
+                              <span>单位换算 <strong>{importPreview.normalizationStats.unitConvertedCount}</strong> 处</span>
+                            )}
+                          </div>
+                          <div className="info-stats-row minor">
+                            {importPreview.normalizationStats.boreholeDepthCount > 0 && <span>钻孔孔深 {importPreview.normalizationStats.boreholeDepthCount}</span>}
+                            {importPreview.normalizationStats.waterLevelCount > 0 && <span>地下水位 {importPreview.normalizationStats.waterLevelCount}</span>}
+                            {importPreview.normalizationStats.layerDepthCount > 0 && <span>分层深度 {importPreview.normalizationStats.layerDepthCount}</span>}
+                            {importPreview.normalizationStats.sptDepthCount > 0 && <span>标贯深度 {importPreview.normalizationStats.sptDepthCount}</span>}
+                          </div>
+                        </div>
+                      )}
+                      {importPreview.checkedBoreholeCount > 0 && (
+                        <div className="info-block">
+                          <h4>✓ 校核状态</h4>
+                          <div className="info-stats-row">
+                            <span><strong>{importPreview.checkedBoreholeCount}</strong> / {importPreview.totalBoreholeCount} 个钻孔含校核数据</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {importPreview.warnings.length > 0 && (
                     <div className="preview-warnings">
@@ -2581,18 +2628,36 @@ function App() {
                       />
                       <span>覆盖冲突数据（{importPreview.conflictCount}个，将丢失本地修改）</span>
                     </label>
+                    <label className="option-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={importOptions.preserveChecked}
+                        onChange={(e) => setImportOptions(prev => ({ ...prev, preserveChecked: e.target.checked }))}
+                      />
+                      <span>保留本地已校核数据（冲突时优先保留本地已校核的记录）</span>
+                    </label>
                   </div>
 
                   <div className="preview-list">
                     <h4>钻孔明细</h4>
                     <div className="borehole-preview-list">
                       {importPreview.boreholes.map((item, i) => (
-                        <div key={i} className={`borehole-preview-item status-${item.status}`}>
+                        <div key={i} className={`borehole-preview-item status-${item.status}${item.isDuplicateInArchive ? ' is-duplicate' : ''}`}>
                           <div className="borehole-preview-id">
                             <span className={`status-dot dot-${item.status}`}></span>
                             <strong>{item.boreholeId}</strong>
+                            {item.checkInfo?.hasAnyChecked && <span className="check-badge" title="含校核数据">✓</span>}
+                            {item.isDuplicateInArchive && <span className="duplicate-badge">重复#{item.duplicateIndex !== undefined ? item.duplicateIndex + 1 : ''}</span>}
                           </div>
                           <span className="borehole-preview-detail">{item.details}</span>
+                          {item.normalizationChanges && item.normalizationChanges.length > 0 && (
+                            <div className="norm-changes">
+                              {item.normalizationChanges.slice(0, 3).map((c, ci) => (
+                                <span key={ci} className="norm-change-tag">{c.field}: {c.original} → {c.normalized}</span>
+                              ))}
+                              {item.normalizationChanges.length > 3 && <span className="norm-change-tag">+{item.normalizationChanges.length - 3}</span>}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -2606,7 +2671,10 @@ function App() {
                     <>
                       <div className="result-icon success">✓</div>
                       <h4>导入成功</h4>
-                      <p>成功导入 <strong>{importResult.importedCount}</strong> 个钻孔，跳过 <strong>{importResult.skippedCount}</strong> 个</p>
+                      <p>
+                        {importResult.resumedFromProgress && <span className="resume-hint">（从中断点恢复） </span>}
+                        成功导入 <strong>{importResult.importedCount}</strong> 个钻孔，跳过 <strong>{importResult.skippedCount}</strong> 个
+                      </p>
                       {importResult.warnings.length > 0 && (
                         <div className="result-warnings">
                           <p>警告信息：</p>
@@ -2623,6 +2691,7 @@ function App() {
                       <div className="result-icon error">✗</div>
                       <h4>导入失败</h4>
                       <p>{importResult.error || "未知错误"}</p>
+                      <p className="result-hint">已导入的数据已保存，可重新选择文件后点击「继续导入」从中断处恢复。</p>
                     </>
                   )}
                 </div>

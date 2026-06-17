@@ -173,11 +173,43 @@ export interface ArchiveData {
 
 export type ImportStatus = "new" | "overwrite" | "conflict" | "unrecognized";
 
+export interface DepthNormalizationChange {
+  field: string;
+  original: string;
+  normalized: string;
+}
+
+export interface BoreholeCheckInfo {
+  layerCheckedCount: number;
+  layerTotalCount: number;
+  sptCheckedCount: number;
+  sptTotalCount: number;
+  samplingCheckedCount: number;
+  samplingTotalCount: number;
+  waterLevelCheckedCount: number;
+  waterLevelTotalCount: number;
+  hasAnyChecked: boolean;
+}
+
 export interface BoreholeImportItem {
   boreholeId: string;
   status: ImportStatus;
   conflictFields?: string[];
   details?: string;
+  normalizationChanges?: DepthNormalizationChange[];
+  checkInfo?: BoreholeCheckInfo;
+  isDuplicateInArchive?: boolean;
+  duplicateIndex?: number;
+}
+
+export interface NormalizationStats {
+  totalChanges: number;
+  boreholeDepthCount: number;
+  waterLevelCount: number;
+  layerDepthCount: number;
+  sptDepthCount: number;
+  samplingDepthCount: number;
+  unitConvertedCount: number;
 }
 
 export interface ImportPreviewResult {
@@ -187,14 +219,20 @@ export interface ImportPreviewResult {
   overwriteCount: number;
   conflictCount: number;
   unrecognizedCount: number;
+  duplicateInArchiveCount: number;
   warnings: string[];
   normalizedData: ArchiveData;
+  normalizationStats: NormalizationStats;
+  checkedBoreholeCount: number;
+  totalBoreholeCount: number;
+  archiveBoreholeIds: string[];
 }
 
 export interface ImportResult {
   success: boolean;
   importedCount: number;
   skippedCount: number;
+  resumedFromProgress?: boolean;
   error?: string;
   warnings: string[];
 }
