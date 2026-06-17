@@ -4004,3 +4004,143 @@ button:disabled:hover {
     margin: 10px;
   }
 }
+
+.wl-timeline-title {
+  margin-top: 14px !important;
+  margin-bottom: 10px !important;
+}
+
+.wl-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wl-timeline-item {
+  display: flex;
+  gap: 12px;
+}
+
+.wl-timeline-dot-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.wl-timeline-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.wl-timeline-dot.dot-stable {
+  background: #2563eb;
+  box-shadow: 0 0 0 1px #2563eb;
+}
+
+.wl-timeline-dot.dot-pending {
+  background: #f59e0b;
+  box-shadow: 0 0 0 1px #f59e0b;
+}
+
+.wl-timeline-line {
+  width: 2px;
+  flex: 1;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+.wl-timeline-content {
+  flex: 1;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  min-width: 0;
+}
+
+.wl-timeline-item.is-last .wl-timeline-content {
+  margin-bottom: 0;
+}
+
+.wl-timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.wl-timeline-time {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e293b;
+  font-variant-numeric: tabular-nums;
+}
+
+.wl-timeline-levels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.wl-timeline-level {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #ffffff;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+
+.wl-timeline-level-label {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.wl-timeline-level-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #2563eb;
+  font-variant-numeric: tabular-nums;
+}
+
+.wl-timeline-level-value.wl-pending {
+  color: #f59e0b !important;
+  font-style: italic;
+}
+
+.wl-timeline-remark {
+  margin-top: 2px;
+}
+
+.wl-timeline-weather {
+  display: inline-block;
+  font-size: 11px;
+  color: #475569;
+  background: #ffffff;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+}
+
+@media (max-width: 640px) {
+  .wl-timeline-levels {
+    grid-template-columns: 1fr;
+  }
+
+  .wl-timeline-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}

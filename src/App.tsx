@@ -973,7 +973,8 @@ function App() {
       const bhSPT = sptRecords[r["钻孔编号"]] || [];
       const bhSampling = samplingRecords[r["钻孔编号"]] || [];
       const wlDisplay = getWaterLevelDisplayText(r["钻孔编号"]);
-      text += `${String(i + 1).padStart(2, "0")}. ${r["钻孔编号"]} | 孔深${r["孔深"]}m | ${r["岩性分类"]} | ${r["岩性描述"]} | 水位${wlDisplay}m | 标贯${bhSPT.length}次 | 取样${bhSampling.length}组\n`;
+      const latestObservation = getLatestWaterLevelObservationText(r["钻孔编号"]);
+      text += `${String(i + 1).padStart(2, "0")}. ${r["钻孔编号"]} | 孔深${r["孔深"]}m | ${r["岩性分类"]} | ${r["岩性描述"]} | 水位${wlDisplay}m | 最近观测：${latestObservation} | 标贯${bhSPT.length}次 | 取样${bhSampling.length}组\n`;
     });
     text += `\n【地层分层】\n`;
     text += `────────────────────────────\n`;
@@ -1812,28 +1813,68 @@ function App() {
                 </div>
               )}
 
-              {latestWaterLevel && (
+              {sortedWaterLevelRecords.length > 0 && (
                 <div className="quick-spt-list">
                   <h4>最新水位观测</h4>
                   <div className="water-level-latest-card">
                     <div className="wl-latest-row">
                       <div className="wl-latest-item">
                         <span className="wl-label">初见水位</span>
-                        <strong className="wl-value">{latestWaterLevel.firstSeenLevel || "-"}m</strong>
+                        <strong className="wl-value">{latestWaterLevel?.firstSeenLevel || "-"}m</strong>
                       </div>
                       <div className="wl-latest-item">
                         <span className="wl-label">稳定水位</span>
-                        <strong className={`wl-value ${!latestWaterLevel.stableLevel ? "wl-pending" : ""}`}>
-                          {latestWaterLevel.stableLevel ? `${latestWaterLevel.stableLevel}m` : "待稳定"}
+                        <strong className={`wl-value ${!latestWaterLevel?.stableLevel ? "wl-pending" : ""}`}>
+                          {latestWaterLevel?.stableLevel ? `${latestWaterLevel.stableLevel}m` : "待稳定"}
                         </strong>
                       </div>
                     </div>
                     <div className="wl-latest-meta">
-                      <span className="wl-time">{latestWaterLevel.observationTime || "时间未记录"}</span>
-                      {latestWaterLevel.weatherRemark && (
+                      <span className="wl-time">{latestWaterLevel?.observationTime || "时间未记录"}</span>
+                      {latestWaterLevel?.weatherRemark && (
                         <span className="wl-weather">{latestWaterLevel.weatherRemark}</span>
                       )}
                     </div>
+                  </div>
+
+                  <h4 className="wl-timeline-title">水位变化时间线</h4>
+                  <div className="wl-timeline">
+                    {sortedWaterLevelRecords.map((record, idx) => {
+                      const isStable = record.stableLevel && record.stableLevel.trim();
+                      return (
+                        <div key={record.id} className={`wl-timeline-item ${idx === sortedWaterLevelRecords.length - 1 ? "is-last" : ""}`}>
+                          <div className="wl-timeline-dot-wrapper">
+                            <div className={`wl-timeline-dot ${isStable ? "dot-stable" : "dot-pending"}`}></div>
+                            {idx < sortedWaterLevelRecords.length - 1 && <div className="wl-timeline-line"></div>}
+                          </div>
+                          <div className="wl-timeline-content">
+                            <div className="wl-timeline-header">
+                              <span className="wl-timeline-time">{record.observationTime || "时间未记录"}</span>
+                              <span className={`status-badge ${isStable ? "status-normal" : "status-watch"}`}>
+                                {isStable ? "已稳定" : "待稳定"}
+                              </span>
+                            </div>
+                            <div className="wl-timeline-levels">
+                              <div className="wl-timeline-level">
+                                <span className="wl-timeline-level-label">初见</span>
+                                <strong className="wl-timeline-level-value">{record.firstSeenLevel || "-"}m</strong>
+                              </div>
+                              <div className="wl-timeline-level">
+                                <span className="wl-timeline-level-label">稳定</span>
+                                <strong className={`wl-timeline-level-value ${!isStable ? "wl-pending" : ""}`}>
+                                  {isStable ? `${record.stableLevel}m` : "待稳定"}
+                                </strong>
+                              </div>
+                            </div>
+                            {record.weatherRemark && (
+                              <div className="wl-timeline-remark">
+                                <span className="wl-timeline-weather">{record.weatherRemark}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
