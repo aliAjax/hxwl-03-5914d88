@@ -6,6 +6,10 @@ export interface StratumLayer {
   soilColor: string;
   density: string;
   description: string;
+  isChecked?: boolean;
+  checkedBy?: string;
+  checkedAt?: string;
+  checkRemark?: string;
 }
 
 export interface BoreholeLayers {
@@ -19,6 +23,10 @@ export interface SPTRecord {
   isAbnormal: boolean;
   remark: string;
   layerId: string;
+  isChecked?: boolean;
+  checkedBy?: string;
+  checkedAt?: string;
+  checkRemark?: string;
 }
 
 export interface BoreholeSPTRecords {
@@ -32,6 +40,10 @@ export interface SamplingRecord {
   sampleNumber: string;
   remark: string;
   layerId: string;
+  isChecked?: boolean;
+  checkedBy?: string;
+  checkedAt?: string;
+  checkRemark?: string;
 }
 
 export interface BoreholeSamplingRecords {
@@ -44,6 +56,10 @@ export interface WaterLevelRecord {
   stableLevel: string;
   observationTime: string;
   weatherRemark: string;
+  isChecked?: boolean;
+  checkedBy?: string;
+  checkedAt?: string;
+  checkRemark?: string;
 }
 
 export interface BoreholeWaterLevelRecords {
@@ -74,6 +90,8 @@ export interface Permissions {
   canExportSummary: boolean;
   canViewChart: boolean;
   canClearData: boolean;
+  canExportArchive: boolean;
+  canImportArchive: boolean;
 }
 
 export const rolePermissions: Record<Role, Permissions> = {
@@ -90,6 +108,8 @@ export const rolePermissions: Record<Role, Permissions> = {
     canExportSummary: true,
     canViewChart: true,
     canClearData: true,
+    canExportArchive: true,
+    canImportArchive: true,
   },
   "岩土工程师": {
     canAddRecord: false,
@@ -104,6 +124,8 @@ export const rolePermissions: Record<Role, Permissions> = {
     canExportSummary: true,
     canViewChart: true,
     canClearData: false,
+    canExportArchive: true,
+    canImportArchive: false,
   },
   "项目负责人": {
     canAddRecord: false,
@@ -118,11 +140,61 @@ export const rolePermissions: Record<Role, Permissions> = {
     canExportSummary: true,
     canViewChart: true,
     canClearData: false,
+    canExportArchive: true,
+    canImportArchive: false,
   },
 };
 
 export const roleDescriptions: Record<Role, string> = {
-  "现场编录员": "可新增、编辑和删除所有记录",
-  "岩土工程师": "仅可校核分层和标贯数据的异常标记和备注",
-  "项目负责人": "仅查看看板和导出摘要",
+  "现场编录员": "可新增、编辑和删除所有记录，可导入导出项目归档",
+  "岩土工程师": "仅可校核分层和标贯数据的异常标记和备注，可导出项目归档",
+  "项目负责人": "仅查看看板和导出摘要，可导出项目归档",
 };
+
+export const ARCHIVE_VERSION = "1.0.0";
+
+export interface ArchiveMeta {
+  version: string;
+  projectId: string;
+  exportedAt: string;
+  exportedBy: string;
+  recordCount: number;
+  totalDepth: string;
+}
+
+export interface ArchiveData {
+  meta: ArchiveMeta;
+  records: DrillingRecord[];
+  boreholeLayers: BoreholeLayers;
+  sptRecords: BoreholeSPTRecords;
+  samplingRecords: BoreholeSamplingRecords;
+  waterLevelRecords: BoreholeWaterLevelRecords;
+}
+
+export type ImportStatus = "new" | "overwrite" | "conflict" | "unrecognized";
+
+export interface BoreholeImportItem {
+  boreholeId: string;
+  status: ImportStatus;
+  conflictFields?: string[];
+  details?: string;
+}
+
+export interface ImportPreviewResult {
+  archiveMeta: ArchiveMeta;
+  boreholes: BoreholeImportItem[];
+  newCount: number;
+  overwriteCount: number;
+  conflictCount: number;
+  unrecognizedCount: number;
+  warnings: string[];
+  normalizedData: ArchiveData;
+}
+
+export interface ImportResult {
+  success: boolean;
+  importedCount: number;
+  skippedCount: number;
+  error?: string;
+  warnings: string[];
+}

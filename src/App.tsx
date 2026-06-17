@@ -11,9 +11,21 @@ import type {
   BoreholeWaterLevelRecords,
   DrillingRecord,
   Role,
+  ImportPreviewResult,
+  ImportResult,
+  ArchiveData,
 } from "./types";
 import { rolePermissions, roleDescriptions } from "./types";
 import { saveProjectData, loadProjectData, clearProjectData, type ProjectData } from "./db";
+import {
+  createArchive,
+  downloadArchive,
+  parseArchiveFile,
+  previewImport,
+  applyImport,
+  getImportProgress,
+  clearImportProgress,
+} from "./archive";
 import BoreholeChart from "./components/BoreholeChart";
 
 const lithologyOptions = ["黏土", "粉质黏土", "粉土", "粉砂", "细砂", "中砂", "粗砂", "卵石", "圆砾", "强风化岩", "中风化岩", "微风化岩"];
@@ -289,6 +301,23 @@ function App() {
   const [lastSavedText, setLastSavedText] = useState<string>("");
   const isFirstLoadRef = useRef(true);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [showArchiveExport, setShowArchiveExport] = useState(false);
+  const [showArchiveImport, setShowArchiveImport] = useState(false);
+  const [importPreview, setImportPreview] = useState<ImportPreviewResult | null>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importError, setImportError] = useState<string>("");
+  const [importLoading, setImportLoading] = useState(false);
+  const [importOptions, setImportOptions] = useState({
+    includeNew: true,
+    includeOverwrite: true,
+    includeConflict: false,
+  });
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [showImportRecovery, setShowImportRecovery] = useState(false);
+  const [interruptedImportInfo, setInterruptedImportInfo] = useState<{ total: number; current: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const currentLayers = useMemo(() => {
     if (!selectedBorehole) return [];
@@ -1192,6 +1221,130 @@ function App() {
     }
   }, []);
 
+  const handleExportArchive = useCallback(() => {
+    const archive = createArchive(
+      project.id,
+      records,
+      boreholeLayers,
+      sptRecords,
+      samplingRecords,
+      waterLevelRecords,
+      currentRole
+    );
+    downloadArchive(archive);
+    setShowArchiveExport(false);
+  }, [records, boreholeLayers, sptRecords, samplingRecords, waterLevelRecords, currentRole]);
+
+  const handleImportFileSelect = useCallback(async (file: File) => {
+    setImportError("");
+    setImportPreview(null);
+    setImportLoading(true);
+    setImportFile(file);
+
+    try {
+      const archiveData = await parseArchiveFile(file);
+      const preview = await previewImport(archiveData);
+      setImportPreview(preview);
+      setImportOptions({
+        includeNew: preview.newCount > 0,
+        includeOverwrite: preview.overwriteCount > 0,
+        includeConflict: false,
+      });
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : "文件解析失败");
+    } finally {
+      setImportLoading(false);
+    }
+  }, []);
+
+  const handleConfirmImport = useCallback(async () => {
+    if (!importPreview) return;
+
+    setImportLoading(true);
+    setImportError("");
+
+    try {
+      const result = await applyImport(importPreview, importOptions);
+      setImportResult(result);
+
+      if (result.success) {
+        const updatedData = await loadProjectData();
+        if (updatedData) {
+          setRecords(updatedData.records);
+          setBoreholeLayers(updatedData.boreholeLayers);
+          setSPTRecords(updatedData.sptRecords);
+          setSamplingRecords(updatedData.samplingRecords);
+          setWaterLevelRecords(updatedData.waterLevelRecords);
+          if (updatedData.records.length > 0 && !selectedBorehole) {
+            setSelectedBorehole(updatedData.records[0]["钻孔编号"]);
+          }
+        }
+      }
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : "导入失败");
+    } finally {
+      setImportLoading(false);
+    }
+  }, [importPreview, importOptions, selectedBorehole]);
+
+  const handleCloseImport = useCallback(() => {
+    setShowArchiveImport(false);
+    setImportPreview(null);
+    setImportFile(null);
+    setImportError("");
+    setImportResult(null);
+    setIsDragOver(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const file = files[0];
+      if (file.type === "application/json" || file.name.endsWith(".json")) {
+        handleImportFileSelect(file);
+      } else {
+        setImportError("请选择 .json 格式的归档文件");
+      }
+    }
+  }, [handleImportFileSelect]);
+
+  const handleDismissRecovery = useCallback(() => {
+    setShowImportRecovery(false);
+    clearImportProgress();
+  }, []);
+
+  useEffect(() => {
+    const progress = getImportProgress();
+    if (progress && progress.status === "interrupted") {
+      setInterruptedImportInfo({ total: progress.total, current: progress.current });
+      setShowImportRecovery(true);
+    }
+  }, []);
+
+  const formatArchiveDate = (isoString: string): string => {
+    const d = new Date(isoString);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  };
+
   return (
     <main className="app-shell">
       {isLoading && (
@@ -1223,6 +1376,16 @@ function App() {
         </div>
       )}
 
+      {showImportRecovery && interruptedImportInfo && (
+        <div className="global-alert alert-warning">
+          <div>
+            <strong>⚠️ 检测到上次导入中断</strong>
+            <span>上次导入在处理 {interruptedImportInfo.current}/{interruptedImportInfo.total} 个钻孔时中断，建议重新导入归档文件以确保数据完整。</span>
+          </div>
+          <button onClick={handleDismissRecovery}>知道了</button>
+        </div>
+      )}
+
       <section className="hero">
         <div>
           <p className="eyebrow">{project.id} · port {project.port}</p>
@@ -1231,6 +1394,22 @@ function App() {
           <div className="hero-meta-row">
             {lastSavedText && <span className="save-status">{lastSavedText}</span>}
             <span className="current-role-badge">当前角色：<strong>{currentRole}</strong></span>
+            <button
+              className={`link-btn ${!permissions.canExportArchive ? "btn-disabled" : ""}`}
+              onClick={permissions.canExportArchive ? () => setShowArchiveExport(true) : undefined}
+              disabled={!permissions.canExportArchive}
+              title={!permissions.canExportArchive ? "当前角色无导出归档权限" : ""}
+            >
+              📤 导出项目归档
+            </button>
+            <button
+              className={`link-btn ${!permissions.canImportArchive ? "btn-disabled" : ""}`}
+              onClick={permissions.canImportArchive ? () => setShowArchiveImport(true) : undefined}
+              disabled={!permissions.canImportArchive}
+              title={!permissions.canImportArchive ? "当前角色无导入归档权限" : ""}
+            >
+              📥 导入项目归档
+            </button>
             <button
               className={`danger-link-btn ${!permissions.canClearData ? "btn-disabled" : ""}`}
               onClick={permissions.canClearData ? () => setShowClearConfirm(true) : undefined}
@@ -2216,6 +2395,256 @@ function App() {
             <div className="modal-footer">
               <button className="secondary-btn" onClick={() => setShowClearConfirm(false)}>取消</button>
               <button className="danger-btn danger-btn-large" onClick={handleClearData}>确认清空</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showArchiveExport && (
+        <div className="modal-overlay" onClick={() => setShowArchiveExport(false)}>
+          <div className="modal-content archive-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>导出项目归档</h3>
+              <button className="modal-close" onClick={() => setShowArchiveExport(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="archive-info">
+                <div className="archive-info-item">
+                  <span>项目编号</span>
+                  <strong>{project.id}</strong>
+                </div>
+                <div className="archive-info-item">
+                  <span>钻孔数量</span>
+                  <strong>{records.length} 条</strong>
+                </div>
+                <div className="archive-info-item">
+                  <span>累计孔深</span>
+                  <strong>{records.reduce((s, r) => s + (parseFloat(r["孔深"]) || 0), 0).toFixed(1)} m</strong>
+                </div>
+                <div className="archive-info-item">
+                  <span>导出角色</span>
+                  <strong>{currentRole}</strong>
+                </div>
+              </div>
+              <div className="archive-desc">
+                <p>归档文件将包含以下数据：</p>
+                <ul>
+                  <li>✓ 钻孔记录（{records.length}条）</li>
+                  <li>✓ 地层分层数据</li>
+                  <li>✓ 标贯试验记录及校核状态</li>
+                  <li>✓ 取样记录</li>
+                  <li>✓ 地下水位观测</li>
+                  <li>✓ 数据版本号 v1.0.0</li>
+                </ul>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="secondary-btn" onClick={() => setShowArchiveExport(false)}>取消</button>
+              <button className="primary-action" onClick={handleExportArchive}>
+                确认导出
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showArchiveImport && (
+        <div className="modal-overlay" onClick={handleCloseImport}>
+          <div className="modal-content archive-modal import-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>导入项目归档</h3>
+              <button className="modal-close" onClick={handleCloseImport}>×</button>
+            </div>
+            <div className="modal-body">
+              {!importFile && !importLoading && (
+                <div
+                  className={`import-dropzone ${isDragOver ? "dragover" : ""}`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".json"
+                    className="import-file-input"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImportFileSelect(file);
+                    }}
+                  />
+                  <div className="dropzone-icon">📁</div>
+                  <p className="dropzone-title">点击或拖拽选择归档文件</p>
+                  <p className="dropzone-hint">支持 .json 格式的项目归档文件</p>
+                </div>
+              )}
+
+              {importLoading && (
+                <div className="import-loading">
+                  <div className="loading-spinner"></div>
+                  <p>正在解析归档文件...</p>
+                </div>
+              )}
+
+              {importError && !importLoading && (
+                <div className="import-error">
+                  <p className="error-title">❌ 导入失败</p>
+                  <p className="error-message">{importError}</p>
+                  <button className="secondary-btn" onClick={() => {
+                    setImportError("");
+                    setImportFile(null);
+                    setImportPreview(null);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}>
+                    重新选择文件
+                  </button>
+                </div>
+              )}
+
+              {importPreview && !importLoading && !importResult && (
+                <div className="import-preview">
+                  <div className="preview-meta">
+                    <div className="preview-meta-item">
+                      <span>项目编号</span>
+                      <strong>{importPreview.archiveMeta.projectId}</strong>
+                    </div>
+                    <div className="preview-meta-item">
+                      <span>归档版本</span>
+                      <strong>v{importPreview.archiveMeta.version}</strong>
+                    </div>
+                    <div className="preview-meta-item">
+                      <span>导出时间</span>
+                      <strong>{formatArchiveDate(importPreview.archiveMeta.exportedAt)}</strong>
+                    </div>
+                    <div className="preview-meta-item">
+                      <span>导出人</span>
+                      <strong>{importPreview.archiveMeta.exportedBy}</strong>
+                    </div>
+                  </div>
+
+                  <div className="preview-stats">
+                    <div className="preview-stat stat-new">
+                      <strong>{importPreview.newCount}</strong>
+                      <span>新增钻孔</span>
+                    </div>
+                    <div className="preview-stat stat-overwrite">
+                      <strong>{importPreview.overwriteCount}</strong>
+                      <span>覆盖更新</span>
+                    </div>
+                    <div className="preview-stat stat-conflict">
+                      <strong>{importPreview.conflictCount}</strong>
+                      <span>存在冲突</span>
+                    </div>
+                    <div className="preview-stat stat-unrecognized">
+                      <strong>{importPreview.unrecognizedCount}</strong>
+                      <span>无法识别</span>
+                    </div>
+                  </div>
+
+                  {importPreview.warnings.length > 0 && (
+                    <div className="preview-warnings">
+                      <h4>⚠️ 处理警告</h4>
+                      <ul>
+                        {importPreview.warnings.slice(0, 5).map((w, i) => (
+                          <li key={i}>{w}</li>
+                        ))}
+                        {importPreview.warnings.length > 5 && (
+                          <li>...还有 {importPreview.warnings.length - 5} 条警告</li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="import-options">
+                    <h4>导入选项</h4>
+                    <label className="option-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={importOptions.includeNew}
+                        onChange={(e) => setImportOptions(prev => ({ ...prev, includeNew: e.target.checked }))}
+                      />
+                      <span>导入新增钻孔（{importPreview.newCount}个）</span>
+                    </label>
+                    <label className="option-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={importOptions.includeOverwrite}
+                        onChange={(e) => setImportOptions(prev => ({ ...prev, includeOverwrite: e.target.checked }))}
+                      />
+                      <span>覆盖更新相同钻孔（{importPreview.overwriteCount}个）</span>
+                    </label>
+                    <label className="option-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={importOptions.includeConflict}
+                        onChange={(e) => setImportOptions(prev => ({ ...prev, includeConflict: e.target.checked }))}
+                      />
+                      <span>覆盖冲突数据（{importPreview.conflictCount}个，将丢失本地修改）</span>
+                    </label>
+                  </div>
+
+                  <div className="preview-list">
+                    <h4>钻孔明细</h4>
+                    <div className="borehole-preview-list">
+                      {importPreview.boreholes.map((item, i) => (
+                        <div key={i} className={`borehole-preview-item status-${item.status}`}>
+                          <div className="borehole-preview-id">
+                            <span className={`status-dot dot-${item.status}`}></span>
+                            <strong>{item.boreholeId}</strong>
+                          </div>
+                          <span className="borehole-preview-detail">{item.details}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {importResult && (
+                <div className="import-result">
+                  {importResult.success ? (
+                    <>
+                      <div className="result-icon success">✓</div>
+                      <h4>导入成功</h4>
+                      <p>成功导入 <strong>{importResult.importedCount}</strong> 个钻孔，跳过 <strong>{importResult.skippedCount}</strong> 个</p>
+                      {importResult.warnings.length > 0 && (
+                        <div className="result-warnings">
+                          <p>警告信息：</p>
+                          <ul>
+                            {importResult.warnings.slice(0, 3).map((w, i) => (
+                              <li key={i}>{w}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="result-icon error">✗</div>
+                      <h4>导入失败</h4>
+                      <p>{importResult.error || "未知错误"}</p>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              {importResult ? (
+                <button className="primary-action" onClick={handleCloseImport}>
+                  完成
+                </button>
+              ) : importPreview && !importLoading ? (
+                <>
+                  <button className="secondary-btn" onClick={handleCloseImport}>取消</button>
+                  <button
+                    className="primary-action"
+                    onClick={handleConfirmImport}
+                    disabled={!importOptions.includeNew && !importOptions.includeOverwrite && !importOptions.includeConflict}
+                  >
+                    确认导入
+                  </button>
+                </>
+              ) : null}
             </div>
           </div>
         </div>
