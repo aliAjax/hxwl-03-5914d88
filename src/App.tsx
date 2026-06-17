@@ -41,6 +41,18 @@ interface BoreholeSamplingRecords {
   [boreholeId: string]: SamplingRecord[];
 }
 
+interface WaterLevelRecord {
+  id: string;
+  firstSeenLevel: string;
+  stableLevel: string;
+  observationTime: string;
+  weatherRemark: string;
+}
+
+interface BoreholeWaterLevelRecords {
+  [boreholeId: string]: WaterLevelRecord[];
+}
+
 const lithologyOptions = ["黏土", "粉质黏土", "粉土", "粉砂", "细砂", "中砂", "粗砂", "卵石", "圆砾", "强风化岩", "中风化岩", "微风化岩"];
 const soilColorOptions = ["褐黄色", "黄褐色", "灰黄色", "灰白色", "灰色", "灰褐色", "紫红色", "杂色"];
 const densityOptions = ["松散", "稍密", "中密", "密实", "可塑", "硬塑", "坚硬", "流塑"];
@@ -131,6 +143,20 @@ const initialSamplingRecords: BoreholeSamplingRecords = {
   ],
 };
 
+const initialWaterLevelRecords: BoreholeWaterLevelRecords = {
+  "ZK-18": [
+    { id: "wl-zk18-1", firstSeenLevel: "3.2", stableLevel: "3.4", observationTime: "2024-06-15 08:30", weatherRemark: "晴，气温26℃" },
+    { id: "wl-zk18-2", firstSeenLevel: "3.3", stableLevel: "3.5", observationTime: "2024-06-16 14:20", weatherRemark: "多云，有微风" },
+  ],
+  "ZK-21": [
+    { id: "wl-zk21-1", firstSeenLevel: "2.6", stableLevel: "2.8", observationTime: "2024-06-15 10:00", weatherRemark: "晴" },
+  ],
+  "ZK-24": [
+    { id: "wl-zk24-1", firstSeenLevel: "5.0", stableLevel: "", observationTime: "2024-06-15 16:45", weatherRemark: "阴，预计有雨" },
+  ],
+  "ZK-27": [],
+};
+
 const project = {
   "id": "hxwl-03",
   "port": 5103,
@@ -152,7 +178,7 @@ const project = {
     "累计孔深",
     "标贯总数",
     "最高标贯",
-    "取样数量"
+    "地下水位"
   ],
   "filters": [
     "黏土",
@@ -255,6 +281,13 @@ const emptySamplingForm: Omit<SamplingRecord, "id" | "layerId"> = {
   remark: ""
 };
 
+const emptyWaterLevelForm: Omit<WaterLevelRecord, "id"> = {
+  firstSeenLevel: "",
+  stableLevel: "",
+  observationTime: "",
+  weatherRemark: ""
+};
+
 function App() {
   const [formData, setFormData] = useState<DrillingRecord>(emptyForm);
   const [records, setRecords] = useState<DrillingRecord[]>(initialRecords);
@@ -282,6 +315,12 @@ function App() {
   const [editingSamplingId, setEditingSamplingId] = useState<string | null>(null);
   const [samplingErrors, setSamplingErrors] = useState<Partial<Record<keyof SamplingRecord, string>>>({});
   const [samplingValidationMessage, setSamplingValidationMessage] = useState<string>("");
+
+  const [waterLevelRecords, setWaterLevelRecords] = useState<BoreholeWaterLevelRecords>(initialWaterLevelRecords);
+  const [waterLevelForm, setWaterLevelForm] = useState<Omit<WaterLevelRecord, "id">>(emptyWaterLevelForm);
+  const [editingWaterLevelId, setEditingWaterLevelId] = useState<string | null>(null);
+  const [waterLevelErrors, setWaterLevelErrors] = useState<Partial<Record<keyof WaterLevelRecord, string>>>({});
+  const [waterLevelValidationMessage, setWaterLevelValidationMessage] = useState<string>("");
 
   const currentLayers = useMemo(() => {
     if (!selectedBorehole) return [];
@@ -319,6 +358,66 @@ function App() {
   const sortedSamplingRecords = useMemo(() => {
     return [...currentSamplingRecords].sort((a, b) => parseFloat(a.depth) - parseFloat(b.depth));
   }, [currentSamplingRecords]);
+
+  const currentWaterLevelRecords = useMemo(() => {
+    if (!selectedBorehole) return [];
+    return waterLevelRecords[selectedBorehole] || [];
+  }, [waterLevelRecords, selectedBorehole]);
+
+  const sortedWaterLevelRecords = useMemo(() => {
+    return [...currentWaterLevelRecords].sort((a, b) => {
+      const timeA = a.observationTime ? new Date(a.observationTime).getTime() : 0;
+      const timeB = b.observationTime ? new Date(b.observationTime).getTime() : 0;
+      return timeB - timeA;
+    });
+  }, [currentWaterLevelRecords]);
+
+  const latestWaterLevel = useMemo(() => {
+    if (sortedWaterLevelRecords.length === 0) return null;
+    for (const record of sortedWaterLevelRecords) {
+      if (record.stableLevel && record.stableLevel.trim()) {
+        return record;
+      }
+    }
+    return sortedWaterLevelRecords[0];
+  }, [sortedWaterLevelRecords]);
+
+  const getLatestStableWaterLevel = useCallback((boreholeId: string): string => {
+    const records = waterLevelRecords[boreholeId] || [];
+    const sorted = [...records].sort((a, b) => {
+      const timeA = a.observationTime ? new Date(a.observationTime).getTime() : 0;
+      const timeB = b.observationTime ? new Date(b.observationTime).getTime() : 0;
+      return timeB - timeA;
+    });
+    for (const record of sorted) {
+      if (record.stableLevel && record.stableLevel.trim()) {
+        return record.stableLevel;
+      }
+    }
+    if (sorted.length > 0 && sorted[0].firstSeenLevel && sorted[0].firstSeenLevel.trim()) {
+      return sorted[0].firstSeenLevel;
+    }
+    return "";
+  }, [waterLevelRecords]);
+
+  const getWaterLevelDisplayText = useCallback((boreholeId: string): string => {
+    const records = waterLevelRecords[boreholeId] || [];
+    if (records.length === 0) return "未观测";
+    const sorted = [...records].sort((a, b) => {
+      const timeA = a.observationTime ? new Date(a.observationTime).getTime() : 0;
+      const timeB = b.observationTime ? new Date(b.observationTime).getTime() : 0;
+      return timeB - timeA;
+    });
+    for (const record of sorted) {
+      if (record.stableLevel && record.stableLevel.trim()) {
+        return record.stableLevel;
+      }
+    }
+    if (sorted[0].firstSeenLevel && sorted[0].firstSeenLevel.trim()) {
+      return `初见${sorted[0].firstSeenLevel}`;
+    }
+    return "未观测";
+  }, [waterLevelRecords]);
 
   const findLayerByDepth = useCallback((depth: number): StratumLayer | null => {
     for (const layer of sortedLayers) {
@@ -581,11 +680,62 @@ function App() {
 
   const handleCancelSamplingEdit = () => { setSamplingForm(emptySamplingForm); setEditingSamplingId(null); setSamplingErrors({}); setSamplingValidationMessage(""); };
 
+  const validateWaterLevelForm = useCallback((): { valid: boolean; errors: Partial<Record<keyof WaterLevelRecord, string>> } => {
+    const errs: Partial<Record<keyof WaterLevelRecord, string>> = {};
+    if (!waterLevelForm.firstSeenLevel.trim()) { errs.firstSeenLevel = "初见水位不能为空"; }
+    else if (isNaN(parseFloat(waterLevelForm.firstSeenLevel)) || parseFloat(waterLevelForm.firstSeenLevel) < 0) { errs.firstSeenLevel = "初见水位必须为非负数"; }
+    if (waterLevelForm.stableLevel.trim()) {
+      if (isNaN(parseFloat(waterLevelForm.stableLevel)) || parseFloat(waterLevelForm.stableLevel) < 0) { errs.stableLevel = "稳定水位必须为非负数"; }
+    }
+    if (!waterLevelForm.observationTime.trim()) { errs.observationTime = "观测时间不能为空"; }
+    return { valid: Object.keys(errs).length === 0, errors: errs };
+  }, [waterLevelForm]);
+
+  const handleWaterLevelInputChange = (field: keyof Omit<WaterLevelRecord, "id">, value: string) => {
+    setWaterLevelForm(prev => ({ ...prev, [field]: value }));
+    if (waterLevelErrors[field]) setWaterLevelErrors(prev => ({ ...prev, [field]: undefined }));
+    if (waterLevelValidationMessage) setWaterLevelValidationMessage("");
+  };
+
+  const handleAddWaterLevelRecord = () => {
+    setWaterLevelValidationMessage("");
+    const { valid, errors: formErrors } = validateWaterLevelForm();
+    setWaterLevelErrors(formErrors);
+    if (!valid) return;
+    if (!selectedBorehole) return;
+    const newRecord: WaterLevelRecord = { ...waterLevelForm, id: generateId() };
+    setWaterLevelRecords(prev => ({ ...prev, [selectedBorehole]: [...(prev[selectedBorehole] || []), newRecord] }));
+    setWaterLevelForm(emptyWaterLevelForm); setWaterLevelErrors({}); setWaterLevelValidationMessage("");
+  };
+
+  const handleUpdateWaterLevelRecord = () => {
+    setWaterLevelValidationMessage("");
+    const { valid, errors: formErrors } = validateWaterLevelForm();
+    setWaterLevelErrors(formErrors);
+    if (!valid || !editingWaterLevelId || !selectedBorehole) return;
+    setWaterLevelRecords(prev => ({ ...prev, [selectedBorehole]: prev[selectedBorehole].map(r => r.id === editingWaterLevelId ? { ...waterLevelForm, id: editingWaterLevelId } : r) }));
+    setWaterLevelForm(emptyWaterLevelForm); setEditingWaterLevelId(null); setWaterLevelErrors({}); setWaterLevelValidationMessage("");
+  };
+
+  const handleEditWaterLevelRecord = (record: WaterLevelRecord) => {
+    setWaterLevelForm({ firstSeenLevel: record.firstSeenLevel, stableLevel: record.stableLevel, observationTime: record.observationTime, weatherRemark: record.weatherRemark });
+    setEditingWaterLevelId(record.id); setWaterLevelErrors({}); setWaterLevelValidationMessage("");
+  };
+
+  const handleDeleteWaterLevelRecord = (recordId: string) => {
+    if (!selectedBorehole) return;
+    setWaterLevelRecords(prev => ({ ...prev, [selectedBorehole]: prev[selectedBorehole].filter(r => r.id !== recordId) }));
+    if (editingWaterLevelId === recordId) { setWaterLevelForm(emptyWaterLevelForm); setEditingWaterLevelId(null); }
+  };
+
+  const handleCancelWaterLevelEdit = () => { setWaterLevelForm(emptyWaterLevelForm); setEditingWaterLevelId(null); setWaterLevelErrors({}); setWaterLevelValidationMessage(""); };
+
   const handleSelectBorehole = (boreholeId: string) => {
     setSelectedBorehole(boreholeId);
     setLayerForm(emptyLayerForm); setEditingLayerId(null); setLayerErrors({}); setLayerValidationMessage("");
     setSPTForm(emptySPTForm); setEditingSPTId(null); setSPTErrors({}); setSPTValidationMessage("");
     setSamplingForm(emptySamplingForm); setEditingSamplingId(null); setSamplingErrors({}); setSamplingValidationMessage("");
+    setWaterLevelForm(emptyWaterLevelForm); setEditingWaterLevelId(null); setWaterLevelErrors({}); setWaterLevelValidationMessage("");
   };
 
   useEffect(() => {
@@ -610,21 +760,28 @@ function App() {
     const totalDepth = filteredRecords.reduce((sum, r) => sum + (parseFloat(r["孔深"]) || 0), 0);
     let totalSPT = 0;
     let maxSPT = 0;
-    let totalSampling = 0;
+    let minStableLevel = Infinity;
+    let hasWaterLevelData = false;
     filteredRecords.forEach(r => {
       const bhSPT = sptRecords[r["钻孔编号"]] || [];
       totalSPT += bhSPT.length;
       bhSPT.forEach(spt => { const blow = parseFloat(spt.blowCount); if (!isNaN(blow) && blow > maxSPT) maxSPT = blow; });
-      const bhSampling = samplingRecords[r["钻孔编号"]] || [];
-      totalSampling += bhSampling.length;
+      const stableLevel = getLatestStableWaterLevel(r["钻孔编号"]);
+      if (stableLevel) {
+        const level = parseFloat(stableLevel);
+        if (!isNaN(level) && level < minStableLevel) {
+          minStableLevel = level;
+          hasWaterLevelData = true;
+        }
+      }
     });
     return [
       totalDepth.toFixed(1) + "m",
       String(totalSPT) + "次",
       String(maxSPT) + "击",
-      String(totalSampling) + "组"
+      hasWaterLevelData ? minStableLevel.toFixed(1) + "m" : "-"
     ];
-  }, [filteredRecords, sptRecords, samplingRecords]);
+  }, [filteredRecords, sptRecords, getLatestStableWaterLevel]);
 
   const summaryStats = useMemo(() => {
     const targetRecords = activeFilter ? filteredRecords : records;
@@ -640,11 +797,20 @@ function App() {
       const bhSampling = samplingRecords[r["钻孔编号"]] || [];
       totalSamplingCount += bhSampling.length;
     });
-    const minWaterLevel = targetRecords.length > 0
-      ? targetRecords.reduce((min, r) => { const wl = parseFloat(r["地下水位"]); return isNaN(wl) ? min : Math.min(min, wl); }, parseFloat(targetRecords[0]["地下水位"]) || 0)
-      : 0;
-    return { projectId: project.id, recordCount, totalDepth: totalDepth.toFixed(1) + "m", maxSPT: String(maxSPT) + "击", minWaterLevel: minWaterLevel.toFixed(1) + "m", totalSPTCount, totalSamplingCount };
-  }, [records, filteredRecords, activeFilter, sptRecords, samplingRecords]);
+    let minWaterLevel = Infinity;
+    let hasWaterLevelData = false;
+    targetRecords.forEach(r => {
+      const stableLevel = getLatestStableWaterLevel(r["钻孔编号"]);
+      if (stableLevel) {
+        const level = parseFloat(stableLevel);
+        if (!isNaN(level) && level < minWaterLevel) {
+          minWaterLevel = level;
+          hasWaterLevelData = true;
+        }
+      }
+    });
+    return { projectId: project.id, recordCount, totalDepth: totalDepth.toFixed(1) + "m", maxSPT: String(maxSPT) + "击", minWaterLevel: hasWaterLevelData ? minWaterLevel.toFixed(1) + "m" : "-", totalSPTCount, totalSamplingCount };
+  }, [records, filteredRecords, activeFilter, sptRecords, samplingRecords, getLatestStableWaterLevel]);
 
   const getBoreholeMaxSPT = useCallback((boreholeId: string): string => {
     const bhSPT = sptRecords[boreholeId] || [];
@@ -675,7 +841,8 @@ function App() {
     targetRecords.forEach((r, i) => {
       const bhSPT = sptRecords[r["钻孔编号"]] || [];
       const bhSampling = samplingRecords[r["钻孔编号"]] || [];
-      text += `${String(i + 1).padStart(2, "0")}. ${r["钻孔编号"]} | 孔深${r["孔深"]}m | ${r["岩性分类"]} | ${r["岩性描述"]} | 水位${r["地下水位"]}m | 标贯${bhSPT.length}次 | 取样${bhSampling.length}组\n`;
+      const wlDisplay = getWaterLevelDisplayText(r["钻孔编号"]);
+      text += `${String(i + 1).padStart(2, "0")}. ${r["钻孔编号"]} | 孔深${r["孔深"]}m | ${r["岩性分类"]} | ${r["岩性描述"]} | 水位${wlDisplay}m | 标贯${bhSPT.length}次 | 取样${bhSampling.length}组\n`;
     });
     text += `\n【地层分层】\n`;
     text += `────────────────────────────\n`;
@@ -721,9 +888,30 @@ function App() {
         text += `  ${String(i + 1).padStart(2, "0")}. 深度 ${s.depth}m | ${s.sampleType} | 编号：${s.sampleNumber} | 岩性：${litho ? litho.lithology : "-"}${s.remark ? " | 备注：" + s.remark : ""}\n`;
       });
     });
+    text += `\n【水位观测明细】\n`;
+    text += `────────────────────────────\n`;
+    targetRecords.forEach(r => {
+      const bhWL = waterLevelRecords[r["钻孔编号"]] || [];
+      if (bhWL.length === 0) {
+        text += `\n${r["钻孔编号"]}：暂无水位观测记录\n`;
+        return;
+      }
+      const sortedWL = [...bhWL].sort((a, b) => {
+        const timeA = a.observationTime ? new Date(a.observationTime).getTime() : 0;
+        const timeB = b.observationTime ? new Date(b.observationTime).getTime() : 0;
+        return timeA - timeB;
+      });
+      const stableCount = sortedWL.filter(w => w.stableLevel && w.stableLevel.trim()).length;
+      text += `\n${r["钻孔编号"]}（共${sortedWL.length}次观测，稳定水位${stableCount}次）：\n`;
+      sortedWL.forEach((w, i) => {
+        const status = w.stableLevel && w.stableLevel.trim() ? "稳定" : "初见";
+        const level = w.stableLevel && w.stableLevel.trim() ? w.stableLevel : w.firstSeenLevel;
+        text += `  ${String(i + 1).padStart(2, "0")}. ${w.observationTime || "时间未记录"} | 初见${w.firstSeenLevel || "-"}m | 稳定${w.stableLevel || "-"}m | ${status}${w.weatherRemark ? " | " + w.weatherRemark : ""}\n`;
+      });
+    });
     text += `────────────────────────────\n`;
     return text;
-  }, [summaryStats, activeFilter, filteredRecords, records, sptRecords, samplingRecords, boreholeLayers]);
+  }, [summaryStats, activeFilter, filteredRecords, records, sptRecords, samplingRecords, boreholeLayers, waterLevelRecords, getWaterLevelDisplayText]);
 
   const handleCopySummary = useCallback(async () => {
     const text = generateTextSummary();
@@ -767,6 +955,7 @@ function App() {
     setBoreholeLayers(prev => ({ ...prev, [boreholeId]: [] }));
     setSPTRecords(prev => ({ ...prev, [boreholeId]: [] }));
     setSamplingRecords(prev => ({ ...prev, [boreholeId]: [] }));
+    setWaterLevelRecords(prev => ({ ...prev, [boreholeId]: [] }));
     setFormData(emptyForm); setErrors({});
   };
 
@@ -863,7 +1052,7 @@ function App() {
             <div className="quick-overview">
               <div className="quick-overview-header">
                 <h3>当前钻孔 · {selectedBorehole}</h3>
-                <span className="quick-overview-sub">孔深 {selectedRecord["孔深"]}m · 水位 {selectedRecord["地下水位"]}m</span>
+                <span className="quick-overview-sub">孔深 {selectedRecord["孔深"]}m · 水位 {getWaterLevelDisplayText(selectedBorehole)}m</span>
               </div>
 
               <div className="quick-stats">
@@ -918,6 +1107,39 @@ function App() {
                       <div className="quick-more">还有 {sortedSamplingRecords.length - 4} 条记录 →</div>
                     )}
                   </div>
+                </div>
+              )}
+
+              {latestWaterLevel && (
+                <div className="quick-spt-list">
+                  <h4>最新水位观测</h4>
+                  <div className="water-level-latest-card">
+                    <div className="wl-latest-row">
+                      <div className="wl-latest-item">
+                        <span className="wl-label">初见水位</span>
+                        <strong className="wl-value">{latestWaterLevel.firstSeenLevel || "-"}m</strong>
+                      </div>
+                      <div className="wl-latest-item">
+                        <span className="wl-label">稳定水位</span>
+                        <strong className={`wl-value ${!latestWaterLevel.stableLevel ? "wl-pending" : ""}`}>
+                          {latestWaterLevel.stableLevel || "待稳定"}m
+                        </strong>
+                      </div>
+                    </div>
+                    <div className="wl-latest-meta">
+                      <span className="wl-time">{latestWaterLevel.observationTime || "时间未记录"}</span>
+                      {latestWaterLevel.weatherRemark && (
+                        <span className="wl-weather">{latestWaterLevel.weatherRemark}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {sortedWaterLevelRecords.length === 0 && (
+                <div className="quick-spt-list">
+                  <h4>水位观测</h4>
+                  <div className="water-level-empty">暂无水位观测记录</div>
                 </div>
               )}
             </div>
@@ -1004,6 +1226,23 @@ function App() {
                       </div>
                     );
                   })}
+                  {latestWaterLevel && (latestWaterLevel.stableLevel || latestWaterLevel.firstSeenLevel) && (() => {
+                    const level = latestWaterLevel.stableLevel || latestWaterLevel.firstSeenLevel;
+                    const depth = parseFloat(level);
+                    const topPercent = holeDepth > 0 ? (depth / holeDepth) * 100 : 0;
+                    const isStable = latestWaterLevel.stableLevel && latestWaterLevel.stableLevel.trim();
+                    return (
+                      <div
+                        key="water-level-marker"
+                        className={`water-level-marker ${isStable ? "wl-stable" : "wl-first-seen"}`}
+                        style={{ top: `${topPercent}%` }}
+                        title={`${isStable ? "稳定水位" : "初见水位"} ${level}m${latestWaterLevel.observationTime ? " · " + latestWaterLevel.observationTime : ""}${latestWaterLevel.weatherRemark ? " · " + latestWaterLevel.weatherRemark : ""}`}
+                      >
+                        <span>水</span>
+                        <span className="wl-marker-level">{level}m</span>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -1132,6 +1371,135 @@ function App() {
                     </div>
                   </div>
                 </div>
+
+                <div className="water-level-section">
+                  <div className="spt-stats">
+                    <div className="spt-stat-card">
+                      <span>观测次数</span>
+                      <strong>{sortedWaterLevelRecords.length}次</strong>
+                      <em>水位观测</em>
+                    </div>
+                    <div className="spt-stat-card">
+                      <span>初见水位</span>
+                      <strong className={latestWaterLevel && !latestWaterLevel.stableLevel ? "wl-pending" : ""}>
+                        {latestWaterLevel?.firstSeenLevel || "-"}m
+                      </strong>
+                      <em>{latestWaterLevel?.stableLevel ? "已稳定" : latestWaterLevel ? "待稳定" : "未观测"}</em>
+                    </div>
+                    <div className="spt-stat-card">
+                      <span>稳定水位</span>
+                      <strong className={!latestWaterLevel?.stableLevel ? "wl-pending" : ""}>
+                        {latestWaterLevel?.stableLevel || "-"}m
+                      </strong>
+                      <em>最新数据</em>
+                    </div>
+                  </div>
+                  <div className="spt-form-section">
+                    <h4>{editingWaterLevelId ? "编辑水位观测" : "新增水位观测"}</h4>
+                    <div className="spt-form-grid">
+                      <label>
+                        <span>初见水位 (m)</span>
+                        <input
+                          type="number"
+                          step="0.1"
+                          className={waterLevelErrors.firstSeenLevel ? "input-error" : ""}
+                          placeholder="初见水位埋深"
+                          value={waterLevelForm.firstSeenLevel}
+                          onChange={(e) => handleWaterLevelInputChange("firstSeenLevel", e.target.value)}
+                        />
+                        {waterLevelErrors.firstSeenLevel && <em className="error-tip">{waterLevelErrors.firstSeenLevel}</em>}
+                      </label>
+                      <label>
+                        <span>稳定水位 (m)</span>
+                        <input
+                          type="number"
+                          step="0.1"
+                          className={waterLevelErrors.stableLevel ? "input-error" : ""}
+                          placeholder="稳定后水位（可选）"
+                          value={waterLevelForm.stableLevel}
+                          onChange={(e) => handleWaterLevelInputChange("stableLevel", e.target.value)}
+                        />
+                        {waterLevelErrors.stableLevel && <em className="error-tip">{waterLevelErrors.stableLevel}</em>}
+                      </label>
+                      <label>
+                        <span>观测时间</span>
+                        <input
+                          type="datetime-local"
+                          className={waterLevelErrors.observationTime ? "input-error" : ""}
+                          value={waterLevelForm.observationTime.replace(" ", "T").slice(0, 16)}
+                          onChange={(e) => handleWaterLevelInputChange("observationTime", e.target.value.replace("T", " "))}
+                        />
+                        {waterLevelErrors.observationTime && <em className="error-tip">{waterLevelErrors.observationTime}</em>}
+                      </label>
+                      <label className="full-width">
+                        <span>天气/备注</span>
+                        <input
+                          placeholder="天气情况或其他备注"
+                          value={waterLevelForm.weatherRemark}
+                          onChange={(e) => handleWaterLevelInputChange("weatherRemark", e.target.value)}
+                        />
+                      </label>
+                    </div>
+                    {waterLevelValidationMessage && (<div className="spt-validation-error">{waterLevelValidationMessage}</div>)}
+                    <div className="spt-form-actions">
+                      {editingWaterLevelId ? (
+                        <>
+                          <button className="secondary-btn" onClick={handleCancelWaterLevelEdit}>取消</button>
+                          <button className="primary-action" onClick={handleUpdateWaterLevelRecord}>更新记录</button>
+                        </>
+                      ) : (
+                        <button className="primary-action" onClick={handleAddWaterLevelRecord}>添加水位观测</button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="spt-list-section">
+                    <h4>水位观测记录列表</h4>
+                    <div className="spt-table-wrapper">
+                      <table className="spt-table">
+                        <thead>
+                          <tr>
+                            <th>序号</th>
+                            <th>观测时间</th>
+                            <th>初见水位</th>
+                            <th>稳定水位</th>
+                            <th>状态</th>
+                            <th>天气/备注</th>
+                            <th>操作</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sortedWaterLevelRecords.map((record, idx) => (
+                            <tr key={record.id} className={editingWaterLevelId === record.id ? "editing-row" : ""}>
+                              <td>{idx + 1}</td>
+                              <td><strong>{record.observationTime || "-"}</strong></td>
+                              <td>{record.firstSeenLevel || "-"}m</td>
+                              <td>
+                                <span className={record.stableLevel ? "wl-value" : "wl-pending"}>
+                                  {record.stableLevel || "-"}m
+                                </span>
+                              </td>
+                              <td>
+                                {record.stableLevel && record.stableLevel.trim() ? (
+                                  <span className="status-badge status-normal">已稳定</span>
+                                ) : (
+                                  <span className="status-badge status-watch">待稳定</span>
+                                )}
+                              </td>
+                              <td className="spt-remark-cell">{record.weatherRemark || "-"}</td>
+                              <td>
+                                <button className="small-btn" onClick={() => handleEditWaterLevelRecord(record)}>编辑</button>
+                                <button className="small-btn danger-btn" onClick={() => handleDeleteWaterLevelRecord(record.id)}>删除</button>
+                              </td>
+                            </tr>
+                          ))}
+                          {sortedWaterLevelRecords.length === 0 && (
+                            <tr><td colSpan={7} className="empty-row">暂无水位观测记录，请添加</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
@@ -1193,13 +1561,14 @@ function App() {
                         const bhSPT = sptRecords[r["钻孔编号"]] || [];
                         const bhSampling = samplingRecords[r["钻孔编号"]] || [];
                         const bhLayers = boreholeLayers[r["钻孔编号"]] || [];
+                        const wlDisplay = getWaterLevelDisplayText(r["钻孔编号"]);
                         return (
                           <tr key={r["钻孔编号"]}>
                             <td>{i + 1}</td>
                             <td><strong>{r["钻孔编号"]}</strong></td>
                             <td>{r["孔深"]}m</td>
                             <td><span className="tag">{r["岩性分类"]}</span></td>
-                            <td>{r["地下水位"]}m</td>
+                            <td>{wlDisplay}m</td>
                             <td>{bhSPT.length}次</td>
                             <td>{bhSampling.length}组</td>
                             <td className="layer-count">共{bhLayers.length}层</td>
@@ -1259,6 +1628,54 @@ function App() {
                                 <span className="spt-remark">{s.sampleNumber}</span>
                                 <span className="spt-litho">{litho ? litho.lithology : "-"}</span>
                                 {s.remark && <span className="spt-remark">{s.remark}</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="summary-section">
+                <h4>水位观测明细</h4>
+                <div className="summary-sampling-list">
+                  {(activeFilter ? filteredRecords : records).map(r => {
+                    const bhWL = waterLevelRecords[r["钻孔编号"]] || [];
+                    if (bhWL.length === 0) {
+                      return (
+                        <div key={r["钻孔编号"]} className="summary-borehole-block">
+                          <h5>{r["钻孔编号"]} <span className="tag">未观测</span></h5>
+                          <div className="summary-sampling-items">
+                            <div className="summary-sampling-item">
+                              <span className="spt-remark">暂无水位观测记录</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    const sortedWL = [...bhWL].sort((a, b) => {
+                      const timeA = a.observationTime ? new Date(a.observationTime).getTime() : 0;
+                      const timeB = b.observationTime ? new Date(b.observationTime).getTime() : 0;
+                      return timeA - timeB;
+                    });
+                    const stableCount = sortedWL.filter(w => w.stableLevel && w.stableLevel.trim()).length;
+                    return (
+                      <div key={r["钻孔编号"]} className="summary-borehole-block">
+                        <h5>{r["钻孔编号"]} <span className="tag">{sortedWL.length}次</span></h5>
+                        <div className="summary-sampling-items">
+                          {sortedWL.map((w, i) => {
+                            const isStable = w.stableLevel && w.stableLevel.trim();
+                            return (
+                              <div key={w.id} className={`summary-sampling-item ${!isStable ? "is-abnormal" : ""}`}>
+                                <span className="spt-depth">{w.observationTime || "时间未记录"}</span>
+                                <span className="sample-type-badge">初见{w.firstSeenLevel || "-"}m</span>
+                                <span className={`sample-type-badge ${isStable ? "" : "wl-pending-badge"}`}>
+                                  稳定{w.stableLevel || "-"}m
+                                </span>
+                                <span className="spt-litho">{isStable ? "已稳定" : "待稳定"}</span>
+                                {w.weatherRemark && <span className="spt-remark">{w.weatherRemark}</span>}
                               </div>
                             );
                           })}
