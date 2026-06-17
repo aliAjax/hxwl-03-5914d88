@@ -192,6 +192,49 @@ label span {
   border-color: var(--primary);
 }
 
+.filter-section {
+  margin-bottom: 20px;
+}
+
+.filter-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  margin: 0 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.clear-filters-btn {
+  width: 100%;
+  margin-top: 8px;
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.clear-filters-btn:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.filter-result-count {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: #64748b;
+  text-align: center;
+}
+
+.filter-result-count strong {
+  color: var(--primary);
+  font-size: 16px;
+  margin: 0 4px;
+}
+
 select {
   width: 100%;
   min-height: 42px;

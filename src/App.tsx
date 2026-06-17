@@ -263,7 +263,17 @@ function App() {
   const [records, setRecords] = useState<DrillingRecord[]>([]);
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [filters, setFilters] = useState<{
+    lithology: string | null;
+    hasGap: boolean | null;
+    hasAbnormalSPT: boolean | null;
+    missingStableWaterLevel: boolean | null;
+  }>({
+    lithology: null,
+    hasGap: null,
+    hasAbnormalSPT: null,
+    missingStableWaterLevel: null,
+  });
   const [showPreview, setShowPreview] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
 
@@ -416,6 +426,35 @@ function App() {
       return `初见${sorted[0].firstSeenLevel}m`;
     }
     return "未观测";
+  }, [waterLevelRecords]);
+
+  const hasLayerGap = useCallback((boreholeId: string): boolean => {
+    const layers = boreholeLayers[boreholeId] || [];
+    if (layers.length === 0) return false;
+    const record = records.find(r => r["钻孔编号"] === boreholeId);
+    if (!record) return false;
+    const holeDepth = parseFloat(record["孔深"]) || 0;
+    if (holeDepth === 0) return false;
+    const sorted = [...layers].sort((a, b) => parseFloat(a.startDepth) - parseFloat(b.startDepth));
+    let prevEnd = 0;
+    for (const layer of sorted) {
+      const ls = parseFloat(layer.startDepth);
+      if (ls > prevEnd + 0.001) return true;
+      prevEnd = Math.max(prevEnd, parseFloat(layer.endDepth));
+    }
+    if (prevEnd < holeDepth - 0.001) return true;
+    return false;
+  }, [boreholeLayers, records]);
+
+  const hasAbnormalSPT = useCallback((boreholeId: string): boolean => {
+    const bhSPT = sptRecords[boreholeId] || [];
+    return bhSPT.some(spt => spt.isAbnormal);
+  }, [sptRecords]);
+
+  const isMissingStableWaterLevel = useCallback((boreholeId: string): boolean => {
+    const bhWL = waterLevelRecords[boreholeId] || [];
+    if (bhWL.length === 0) return true;
+    return !bhWL.some(wl => wl.stableLevel && wl.stableLevel.trim());
   }, [waterLevelRecords]);
 
   const getLatestWaterLevelObservationText = useCallback((boreholeId: string): string => {
@@ -821,10 +860,32 @@ function App() {
     setGapMessage(gaps.length > 0 ? `存在缺口区间：${gaps.join("、")}` : "");
   }, [sortedLayers, holeDepth]);
 
+  const hasActiveFilters = useMemo(() => {
+    return filters.lithology !== null || filters.hasGap !== null || filters.hasAbnormalSPT !== null || filters.missingStableWaterLevel !== null;
+  }, [filters]);
+
   const filteredRecords = useMemo(() => {
-    if (!activeFilter) return records;
-    return records.filter(r => r["岩性分类"] === activeFilter);
-  }, [records, activeFilter]);
+    if (!hasActiveFilters) return records;
+    return records.filter(r => {
+      const boreholeId = r["钻孔编号"];
+      if (filters.lithology !== null && r["岩性分类"] !== filters.lithology) {
+        return false;
+      }
+      if (filters.hasGap !== null) {
+        const hasGap = hasLayerGap(boreholeId);
+        if (filters.hasGap !== hasGap) return false;
+      }
+      if (filters.hasAbnormalSPT !== null) {
+        const hasAbnormal = hasAbnormalSPT(boreholeId);
+        if (filters.hasAbnormalSPT !== hasAbnormal) return false;
+      }
+      if (filters.missingStableWaterLevel !== null) {
+        const missing = isMissingStableWaterLevel(boreholeId);
+        if (filters.missingStableWaterLevel !== missing) return false;
+      }
+      return true;
+    });
+  }, [records, filters, hasActiveFilters, hasLayerGap, hasAbnormalSPT, isMissingStableWaterLevel]);
 
   const metrics = useMemo(() => {
     const totalDepth = filteredRecords.reduce((sum, r) => sum + (parseFloat(r["孔深"]) || 0), 0);
@@ -854,7 +915,7 @@ function App() {
   }, [filteredRecords, sptRecords, getLatestStableWaterLevel]);
 
   const summaryStats = useMemo(() => {
-    const targetRecords = activeFilter ? filteredRecords : records;
+    const targetRecords = filteredRecords;
     const totalDepth = targetRecords.reduce((sum, r) => sum + (parseFloat(r["孔深"]) || 0), 0);
     const recordCount = targetRecords.length;
     let maxSPT = 0;
@@ -880,7 +941,7 @@ function App() {
       }
     });
     return { projectId: project.id, recordCount, totalDepth: totalDepth.toFixed(1) + "m", maxSPT: String(maxSPT) + "击", minWaterLevel: hasWaterLevelData ? minWaterLevel.toFixed(1) + "m" : "-", totalSPTCount, totalSamplingCount };
-  }, [records, filteredRecords, activeFilter, sptRecords, samplingRecords, getLatestStableWaterLevel]);
+  }, [filteredRecords, sptRecords, samplingRecords, getLatestStableWaterLevel]);
 
   const getBoreholeMaxSPT = useCallback((boreholeId: string): string => {
     const bhSPT = sptRecords[boreholeId] || [];
@@ -892,7 +953,7 @@ function App() {
 
   const generateTextSummary = useCallback(() => {
     const { projectId, recordCount, totalDepth, maxSPT, minWaterLevel, totalSPTCount, totalSamplingCount } = summaryStats;
-    const targetRecords = activeFilter ? filteredRecords : records;
+    const targetRecords = filteredRecords;
     const now = new Date();
     const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
@@ -981,7 +1042,7 @@ function App() {
     });
     text += `────────────────────────────\n`;
     return text;
-  }, [summaryStats, activeFilter, filteredRecords, records, sptRecords, samplingRecords, boreholeLayers, waterLevelRecords, getWaterLevelDisplayText]);
+  }, [summaryStats, filteredRecords, sptRecords, samplingRecords, boreholeLayers, waterLevelRecords, getWaterLevelDisplayText]);
 
   const handleCopySummary = useCallback(async () => {
     const text = generateTextSummary();
@@ -1147,7 +1208,7 @@ function App() {
   }, [permissions.canEditRecord, editingRecordId]);
 
   const allSPTForSummary = useMemo(() => {
-    const targetRecords = activeFilter ? filteredRecords : records;
+    const targetRecords = filteredRecords;
     const result: { boreholeId: string; depth: string; blowCount: string; isAbnormal: boolean; lithology: string; remark: string }[] = [];
     targetRecords.forEach(r => {
       const bhSPT = sptRecords[r["钻孔编号"]] || [];
@@ -1157,10 +1218,10 @@ function App() {
       });
     });
     return result.sort((a, b) => parseFloat(a.depth) - parseFloat(b.depth));
-  }, [records, filteredRecords, activeFilter, sptRecords, getLayerLithology]);
+  }, [filteredRecords, sptRecords, getLayerLithology]);
 
   const allSamplingForSummary = useMemo(() => {
-    const targetRecords = activeFilter ? filteredRecords : records;
+    const targetRecords = filteredRecords;
     const result: { boreholeId: string; depth: string; sampleType: string; sampleNumber: string; lithology: string; remark: string }[] = [];
     targetRecords.forEach(r => {
       const bhSampling = samplingRecords[r["钻孔编号"]] || [];
@@ -1170,7 +1231,7 @@ function App() {
       });
     });
     return result.sort((a, b) => parseFloat(a.depth) - parseFloat(b.depth));
-  }, [records, filteredRecords, activeFilter, samplingRecords, getLayerLithology]);
+  }, [filteredRecords, samplingRecords, getLayerLithology]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -1518,13 +1579,117 @@ function App() {
             <span className="role-icon">🔒</span>
             <p>{roleDescriptions[currentRole]}</p>
           </div>
-          <h2>现场筛选</h2>
-          <div className="chips filter-chips">
-            {project.filters.map((filter: string) => (
-              <button key={filter} className={activeFilter === filter ? "filter-active" : ""} onClick={() => setActiveFilter(prev => prev === filter ? null : filter)}>
-                {filter}
+          <h2>组合筛选</h2>
+          
+          <div className="filter-section">
+            <h3 className="filter-section-title">岩性分类</h3>
+            <div className="chips filter-chips">
+              <button 
+                className={filters.lithology === null ? "filter-active" : ""} 
+                onClick={() => setFilters(prev => ({ ...prev, lithology: null }))}
+              >
+                全部
               </button>
-            ))}
+              {project.filters.map((filter: string) => (
+                <button 
+                  key={filter} 
+                  className={filters.lithology === filter ? "filter-active" : ""} 
+                  onClick={() => setFilters(prev => ({ ...prev, lithology: prev.lithology === filter ? null : filter }))}
+                >
+                  {filter}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="filter-section">
+            <h3 className="filter-section-title">分层缺口</h3>
+            <div className="chips filter-chips">
+              <button 
+                className={filters.hasGap === null ? "filter-active" : ""} 
+                onClick={() => setFilters(prev => ({ ...prev, hasGap: null }))}
+              >
+                全部
+              </button>
+              <button 
+                className={filters.hasGap === true ? "filter-active" : ""} 
+                onClick={() => setFilters(prev => ({ ...prev, hasGap: prev.hasGap === true ? null : true }))}
+              >
+                有缺口
+              </button>
+              <button 
+                className={filters.hasGap === false ? "filter-active" : ""} 
+                onClick={() => setFilters(prev => ({ ...prev, hasGap: prev.hasGap === false ? null : false }))}
+              >
+                无缺口
+              </button>
+            </div>
+          </div>
+
+          <div className="filter-section">
+            <h3 className="filter-section-title">异常标贯</h3>
+            <div className="chips filter-chips">
+              <button 
+                className={filters.hasAbnormalSPT === null ? "filter-active" : ""} 
+                onClick={() => setFilters(prev => ({ ...prev, hasAbnormalSPT: null }))}
+              >
+                全部
+              </button>
+              <button 
+                className={filters.hasAbnormalSPT === true ? "filter-active" : ""} 
+                onClick={() => setFilters(prev => ({ ...prev, hasAbnormalSPT: prev.hasAbnormalSPT === true ? null : true }))}
+              >
+                有异常
+              </button>
+              <button 
+                className={filters.hasAbnormalSPT === false ? "filter-active" : ""} 
+                onClick={() => setFilters(prev => ({ ...prev, hasAbnormalSPT: prev.hasAbnormalSPT === false ? null : false }))}
+              >
+                无异常
+              </button>
+            </div>
+          </div>
+
+          <div className="filter-section">
+            <h3 className="filter-section-title">稳定水位</h3>
+            <div className="chips filter-chips">
+              <button 
+                className={filters.missingStableWaterLevel === null ? "filter-active" : ""} 
+                onClick={() => setFilters(prev => ({ ...prev, missingStableWaterLevel: null }))}
+              >
+                全部
+              </button>
+              <button 
+                className={filters.missingStableWaterLevel === true ? "filter-active" : ""} 
+                onClick={() => setFilters(prev => ({ ...prev, missingStableWaterLevel: prev.missingStableWaterLevel === true ? null : true }))}
+              >
+                缺稳定水位
+              </button>
+              <button 
+                className={filters.missingStableWaterLevel === false ? "filter-active" : ""} 
+                onClick={() => setFilters(prev => ({ ...prev, missingStableWaterLevel: prev.missingStableWaterLevel === false ? null : false }))}
+              >
+                有稳定水位
+              </button>
+            </div>
+          </div>
+
+          {hasActiveFilters && (
+            <button 
+              className="clear-filters-btn"
+              onClick={() => setFilters({
+                lithology: null,
+                hasGap: null,
+                hasAbnormalSPT: null,
+                missingStableWaterLevel: null,
+              })}
+            >
+              清除所有筛选
+            </button>
+          )}
+
+          <div className="filter-result-count">
+            筛选结果：<strong>{filteredRecords.length}</strong> / {records.length} 条
           </div>
         </aside>
 
@@ -2296,7 +2461,7 @@ function App() {
                       <tr><th>序号</th><th>钻孔编号</th><th>孔深</th><th>岩性分类</th><th>地下水位</th><th>标贯</th><th>取样</th><th>地层</th></tr>
                     </thead>
                     <tbody>
-                      {(activeFilter ? filteredRecords : records).map((r, i) => {
+                      {filteredRecords.map((r, i) => {
                         const bhSPT = sptRecords[r["钻孔编号"]] || [];
                         const bhSampling = samplingRecords[r["钻孔编号"]] || [];
                         const bhLayers = boreholeLayers[r["钻孔编号"]] || [];
@@ -2322,7 +2487,7 @@ function App() {
               <div className="summary-section">
                 <h4>标贯试验明细</h4>
                 <div className="summary-spt-list">
-                  {(activeFilter ? filteredRecords : records).map(r => {
+                  {filteredRecords.map(r => {
                     const bhSPT = sptRecords[r["钻孔编号"]] || [];
                     if (bhSPT.length === 0) return null;
                     return (
@@ -2351,7 +2516,7 @@ function App() {
               <div className="summary-section">
                 <h4>取样记录明细</h4>
                 <div className="summary-sampling-list">
-                  {(activeFilter ? filteredRecords : records).map(r => {
+                  {filteredRecords.map(r => {
                     const bhSampling = samplingRecords[r["钻孔编号"]] || [];
                     if (bhSampling.length === 0) return null;
                     return (
@@ -2380,7 +2545,7 @@ function App() {
               <div className="summary-section">
                 <h4>水位观测明细</h4>
                 <div className="summary-sampling-list">
-                  {(activeFilter ? filteredRecords : records).map(r => {
+                  {filteredRecords.map(r => {
                     const bhWL = waterLevelRecords[r["钻孔编号"]] || [];
                     if (bhWL.length === 0) {
                       return (
