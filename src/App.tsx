@@ -374,12 +374,16 @@ function App() {
 
   const latestWaterLevel = useMemo(() => {
     if (sortedWaterLevelRecords.length === 0) return null;
+    return sortedWaterLevelRecords[0];
+  }, [sortedWaterLevelRecords]);
+
+  const latestStableWaterLevel = useMemo(() => {
     for (const record of sortedWaterLevelRecords) {
       if (record.stableLevel && record.stableLevel.trim()) {
         return record;
       }
     }
-    return sortedWaterLevelRecords[0];
+    return null;
   }, [sortedWaterLevelRecords]);
 
   const getLatestStableWaterLevel = useCallback((boreholeId: string): string => {
@@ -410,11 +414,11 @@ function App() {
     });
     for (const record of sorted) {
       if (record.stableLevel && record.stableLevel.trim()) {
-        return record.stableLevel;
+        return record.stableLevel + "m";
       }
     }
     if (sorted[0].firstSeenLevel && sorted[0].firstSeenLevel.trim()) {
-      return `初见${sorted[0].firstSeenLevel}`;
+      return `初见${sorted[0].firstSeenLevel}m`;
     }
     return "未观测";
   }, [waterLevelRecords]);
@@ -1052,7 +1056,7 @@ function App() {
             <div className="quick-overview">
               <div className="quick-overview-header">
                 <h3>当前钻孔 · {selectedBorehole}</h3>
-                <span className="quick-overview-sub">孔深 {selectedRecord["孔深"]}m · 水位 {getWaterLevelDisplayText(selectedBorehole)}m</span>
+                <span className="quick-overview-sub">孔深 {selectedRecord["孔深"]}m · 水位 {getWaterLevelDisplayText(selectedBorehole)}</span>
               </div>
 
               <div className="quick-stats">
@@ -1226,17 +1230,20 @@ function App() {
                       </div>
                     );
                   })}
-                  {latestWaterLevel && (latestWaterLevel.stableLevel || latestWaterLevel.firstSeenLevel) && (() => {
-                    const level = latestWaterLevel.stableLevel || latestWaterLevel.firstSeenLevel;
+                  {(latestStableWaterLevel || latestWaterLevel) && (() => {
+                    const targetRecord = latestStableWaterLevel || latestWaterLevel;
+                    if (!targetRecord) return null;
+                    const level = targetRecord.stableLevel || targetRecord.firstSeenLevel;
+                    if (!level) return null;
                     const depth = parseFloat(level);
                     const topPercent = holeDepth > 0 ? (depth / holeDepth) * 100 : 0;
-                    const isStable = latestWaterLevel.stableLevel && latestWaterLevel.stableLevel.trim();
+                    const isStable = targetRecord.stableLevel && targetRecord.stableLevel.trim();
                     return (
                       <div
                         key="water-level-marker"
                         className={`water-level-marker ${isStable ? "wl-stable" : "wl-first-seen"}`}
                         style={{ top: `${topPercent}%` }}
-                        title={`${isStable ? "稳定水位" : "初见水位"} ${level}m${latestWaterLevel.observationTime ? " · " + latestWaterLevel.observationTime : ""}${latestWaterLevel.weatherRemark ? " · " + latestWaterLevel.weatherRemark : ""}`}
+                        title={`${isStable ? "稳定水位" : "初见水位"} ${level}m${targetRecord.observationTime ? " · " + targetRecord.observationTime : ""}${targetRecord.weatherRemark ? " · " + targetRecord.weatherRemark : ""}`}
                       >
                         <span>水</span>
                         <span className="wl-marker-level">{level}m</span>
@@ -1381,17 +1388,17 @@ function App() {
                     </div>
                     <div className="spt-stat-card">
                       <span>初见水位</span>
-                      <strong className={latestWaterLevel && !latestWaterLevel.stableLevel ? "wl-pending" : ""}>
+                      <strong className={!latestStableWaterLevel ? "wl-pending" : ""}>
                         {latestWaterLevel?.firstSeenLevel || "-"}m
                       </strong>
-                      <em>{latestWaterLevel?.stableLevel ? "已稳定" : latestWaterLevel ? "待稳定" : "未观测"}</em>
+                      <em>{sortedWaterLevelRecords.length === 0 ? "未观测" : "最新观测"}</em>
                     </div>
                     <div className="spt-stat-card">
                       <span>稳定水位</span>
-                      <strong className={!latestWaterLevel?.stableLevel ? "wl-pending" : ""}>
-                        {latestWaterLevel?.stableLevel || "-"}m
+                      <strong className={!latestStableWaterLevel ? "wl-pending" : ""}>
+                        {latestStableWaterLevel?.stableLevel || "-"}m
                       </strong>
-                      <em>最新数据</em>
+                      <em>{latestStableWaterLevel ? "已稳定" : sortedWaterLevelRecords.length === 0 ? "未观测" : "待稳定"}</em>
                     </div>
                   </div>
                   <div className="spt-form-section">
@@ -1568,7 +1575,7 @@ function App() {
                             <td><strong>{r["钻孔编号"]}</strong></td>
                             <td>{r["孔深"]}m</td>
                             <td><span className="tag">{r["岩性分类"]}</span></td>
-                            <td>{wlDisplay}m</td>
+                            <td>{wlDisplay}</td>
                             <td>{bhSPT.length}次</td>
                             <td>{bhSampling.length}组</td>
                             <td className="layer-count">共{bhLayers.length}层</td>
