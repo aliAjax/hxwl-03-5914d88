@@ -2270,16 +2270,28 @@ button:disabled:hover {
 
 .chart-wrapper {
   position: relative;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.chart-scroll-container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 4px;
 }
 
 .borehole-chart {
   position: relative;
   display: flex;
+  min-width: 600px;
   min-height: 600px;
   background: #ffffff;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
+  box-sizing: border-box;
+  padding-top: 40px;
 }
 
 .chart-scale {
@@ -2288,9 +2300,14 @@ button:disabled:hover {
   flex-shrink: 0;
   background: #f8fafc;
   border-right: 2px solid var(--border);
+  height: 100%;
 }
 
 .scale-title {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  right: 0;
   height: 40px;
   display: flex;
   align-items: center;
@@ -2300,6 +2317,7 @@ button:disabled:hover {
   color: #475569;
   border-bottom: 2px solid var(--border);
   background: #f1f5f9;
+  box-sizing: border-box;
 }
 
 .scale-tick {
@@ -2342,14 +2360,18 @@ button:disabled:hover {
 .chart-columns {
   flex: 1;
   display: flex;
-  overflow-x: auto;
+  min-width: 0;
+  height: 100%;
 }
 
 .column {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 100px;
   border-right: 1px solid var(--border);
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .column:last-child {
@@ -2375,6 +2397,10 @@ button:disabled:hover {
 }
 
 .column .column-header {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  right: 0;
   height: 40px;
   display: flex;
   align-items: center;
@@ -2386,12 +2412,16 @@ button:disabled:hover {
   border-bottom: 2px solid var(--border);
   padding: 0 8px;
   text-align: center;
+  box-sizing: border-box;
+  z-index: 2;
 }
 
 .column-body {
   position: relative;
   flex: 1;
   background: linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%);
+  width: 100%;
+  overflow: hidden;
 }
 
 .depth-cell {
@@ -2408,8 +2438,9 @@ button:disabled:hover {
   transition: all 0.15s ease;
 }
 
-.depth-cell.expanded {
-  background: linear-gradient(to bottom, #fff7ed 0%, #ffedd5 100%);
+.depth-cell.thin-layer {
+  background: linear-gradient(to bottom, #f0f9ff 0%, #e0f2fe 100%);
+  border-bottom-style: dashed;
 }
 
 .depth-value {
@@ -2439,9 +2470,27 @@ button:disabled:hover {
   transition: all 0.15s ease;
 }
 
-.lithology-cell.expanded {
+.lithology-cell.thin-layer {
   border-style: dashed;
-  border-color: #f59e0b;
+  border-color: #0ea5e9;
+}
+
+.lithology-cell.has-callout .callout-marker {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  background: #0ea5e9;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  line-height: 1;
 }
 
 .lithology-pattern {
@@ -2482,14 +2531,33 @@ button:disabled:hover {
   font-weight: 500;
 }
 
-.expanded-indicator {
-  position: absolute;
-  top: 2px;
-  right: 4px;
+.thin-layer-desc {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: 10px;
-  color: #dc2626;
+}
+
+.thin-index {
+  background: #0ea5e9;
+  color: #ffffff;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
   font-weight: 700;
-  z-index: 3;
+  flex-shrink: 0;
+}
+
+.thin-name {
+  font-weight: 600;
+  color: #0369a1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .water-level-line {
@@ -2612,8 +2680,19 @@ button:disabled:hover {
   background: #ffffff;
 }
 
-.description-cell.expanded {
-  background: linear-gradient(to bottom, #fff7ed 0%, #ffedd5 100%);
+.description-cell.thin-layer {
+  background: linear-gradient(to bottom, #f0f9ff 0%, #e0f2fe 100%);
+  border-bottom-style: dashed;
+}
+
+.column-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  color: #94a3b8;
+  white-space: nowrap;
 }
 
 .description-layer-index {
@@ -2705,9 +2784,86 @@ button:disabled:hover {
   margin-right: 8px;
 }
 
+.thin-layer-callouts {
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+}
+
+.callouts-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0369a1;
+  margin-bottom: 10px;
+}
+
+.callouts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.callout-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  padding: 6px 8px;
+  background: #ffffff;
+  border-radius: 6px;
+  border: 1px solid #e0f2fe;
+}
+
+.callout-num {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  background: #0ea5e9;
+  color: #ffffff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.callout-depth {
+  font-weight: 600;
+  color: #0c4a6e;
+  flex-shrink: 0;
+}
+
+.callout-lithology {
+  font-weight: 600;
+  color: #0369a1;
+}
+
+.callout-density {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.callout-desc {
+  color: #475569;
+  font-size: 11px;
+}
+
 @media (max-width: 960px) {
   .borehole-chart-container {
     padding: 14px;
+  }
+
+  .chart-scroll-container {
+    border-radius: 6px;
+  }
+
+  .borehole-chart {
+    min-width: 520px;
+    min-height: 500px;
   }
 
   .chart-header {
@@ -2768,11 +2924,37 @@ button:disabled:hover {
     width: 34px;
     font-size: 10px;
   }
+
+  .thin-layer-callouts {
+    padding: 10px 12px;
+  }
+
+  .callout-item {
+    flex-wrap: wrap;
+  }
 }
 
 @media (max-width: 640px) {
   .borehole-chart-container {
     padding: 10px;
+  }
+
+  .chart-scroll-container {
+    border-radius: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .borehole-chart {
+    min-width: 460px;
+    min-height: 450px;
+  }
+
+  .chart-title h3 {
+    font-size: 15px;
+  }
+
+  .chart-subtitle {
+    font-size: 12px;
   }
 
   .issues-header {
@@ -2850,6 +3032,28 @@ button:disabled:hover {
     display: block;
     margin-right: 0;
     margin-bottom: 4px;
+  }
+
+  .thin-layer-callouts {
+    padding: 8px 10px;
+  }
+
+  .callouts-title {
+    font-size: 11px;
+    margin-bottom: 8px;
+  }
+
+  .callout-item {
+    font-size: 11px;
+    padding: 4px 6px;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .callout-num {
+    width: 16px;
+    height: 16px;
+    font-size: 9px;
   }
 }
 
@@ -2974,13 +3178,34 @@ button:disabled:hover {
     border-bottom: 1px solid #ccc !important;
   }
 
-  .depth-cell.expanded,
-  .description-cell.expanded {
-    background: #fff7ed !important;
+  .depth-cell.thin-layer,
+  .description-cell.thin-layer {
+    background: #f0f9ff !important;
+    border-bottom-style: dashed !important;
   }
 
-  .lithology-cell.expanded {
-    border-color: #f59e0b !important;
+  .lithology-cell.thin-layer {
+    border-color: #0ea5e9 !important;
+    border-style: dashed !important;
+  }
+
+  .callout-marker {
+    background: #0ea5e9 !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .thin-layer-callouts {
+    page-break-inside: avoid;
+    border: 1px solid #bae6fd !important;
+    background: #f0f9ff !important;
+    margin-top: 8px !important;
+  }
+
+  .callout-item {
+    border: 1px solid #e0f2fe !important;
+    background: #ffffff !important;
   }
 
   .column {
@@ -2991,8 +3216,9 @@ button:disabled:hover {
     border-right: 1px solid #333 !important;
   }
 
-  .expanded-indicator {
-    color: #dc2626 !important;
+  .thin-index {
+    background: #0ea5e9 !important;
+    color: #ffffff !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }

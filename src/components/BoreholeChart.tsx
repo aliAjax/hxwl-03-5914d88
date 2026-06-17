@@ -205,31 +205,56 @@ const validateData = (
     }
   }
 
-  for (const wl of waterLevelRecords) {
+  for (let i = 0; i < waterLevelRecords.length; i++) {
+    const wl = waterLevelRecords[i];
     const firstSeen = parseFloat(wl.firstSeenLevel);
     const stable = parseFloat(wl.stableLevel);
 
-    if (wl.firstSeenLevel.trim() && (isNaN(firstSeen) || firstSeen < 0)) {
-      issues.push({
-        type: "warning",
-        message: `初见水位无效："${wl.firstSeenLevel}"m`,
-        severity: 3,
-      });
+    if (wl.firstSeenLevel.trim()) {
+      if (isNaN(firstSeen) || firstSeen < 0) {
+        issues.push({
+          type: "error",
+          message: `第 ${i + 1} 条水位记录初见水位无效："${wl.firstSeenLevel}"m，必须为非负数`,
+          severity: 8,
+        });
+      } else if (firstSeen > holeDepth) {
+        issues.push({
+          type: "error",
+          message: `第 ${i + 1} 条水位记录初见水位 ${firstSeen}m 超过钻孔深度 ${holeDepth}m`,
+          severity: 8,
+        });
+      }
     }
 
-    if (wl.stableLevel.trim() && (isNaN(stable) || stable < 0)) {
-      issues.push({
-        type: "warning",
-        message: `稳定水位无效："${wl.stableLevel}"m`,
-        severity: 3,
-      });
+    if (wl.stableLevel.trim()) {
+      if (isNaN(stable) || stable < 0) {
+        issues.push({
+          type: "error",
+          message: `第 ${i + 1} 条水位记录稳定水位无效："${wl.stableLevel}"m，必须为非负数`,
+          severity: 8,
+        });
+      } else if (stable > holeDepth) {
+        issues.push({
+          type: "error",
+          message: `第 ${i + 1} 条水位记录稳定水位 ${stable}m 超过钻孔深度 ${holeDepth}m`,
+          severity: 8,
+        });
+      }
     }
 
-    if (firstSeen > holeDepth) {
+    if (
+      wl.firstSeenLevel.trim() &&
+      wl.stableLevel.trim() &&
+      !isNaN(firstSeen) &&
+      !isNaN(stable) &&
+      firstSeen > 0 &&
+      stable > 0 &&
+      firstSeen < stable
+    ) {
       issues.push({
-        type: "warning",
-        message: `初见水位 ${firstSeen}m 超过钻孔深度 ${holeDepth}m`,
-        severity: 2,
+        type: "error",
+        message: `第 ${i + 1} 条水位记录异常：稳定水位 ${stable}m 深于初见水位 ${firstSeen}m（稳定水位应浅于或等于初见水位）`,
+        severity: 8,
       });
     }
   }
@@ -238,7 +263,7 @@ const validateData = (
   return { valid: !hasErrors, issues };
 };
 
-const MIN_LAYER_HEIGHT = 28;
+const MIN_LABEL_HEIGHT = 22;
 
 export default function BoreholeChart({
   boreholeId,
@@ -276,88 +301,61 @@ export default function BoreholeChart({
     for (const record of waterLevelRecords) {
       if (record.stableLevel && record.stableLevel.trim()) {
         const level = parseFloat(record.stableLevel);
-        if (!isNaN(level) && level >= 0) return level;
+        if (!isNaN(level) && level >= 0 && level <= holeDepth) return level;
       }
     }
     return null;
-  }, [waterLevelRecords]);
+  }, [waterLevelRecords, holeDepth]);
 
-  const chartData = useMemo(() => {
+  const chartBase = useMemo(() => {
     if (!valid || sortedLayers.length === 0) return null;
 
     const totalDepth = holeDepth;
-    const chartHeight = Math.max(600, totalDepth * 30);
+    const baseChartHeight = Math.max(500, totalDepth * 25);
+    const pixelsPerMeter = baseChartHeight / totalDepth;
 
-    const layerHeights: { layer: StratumLayer; top: number; height: number; expanded: boolean }[] = [];
-    let currentTop = 0;
-
-    const minHeightPerMeter = MIN_LAYER_HEIGHT / 0.5;
+    const layerHeights: {
+      layer: StratumLayer;
+      top: number;
+      height: number;
+      isThin: boolean;
+      needsCallout: boolean;
+    }[] = [];
 
     for (const layer of sortedLayers) {
       const start = parseFloat(layer.startDepth);
       const end = parseFloat(layer.endDepth);
       const thickness = end - start;
 
-      let height = (thickness / totalDepth) * chartHeight;
-      let expanded = false;
-
-      if (height < MIN_LAYER_HEIGHT) {
-        height = MIN_LAYER_HEIGHT;
-        expanded = true;
-      }
-
-      const minHeightByThickness = thickness * minHeightPerMeter;
-      if (height < minHeightByThickness) {
-        height = minHeightByThickness;
-        expanded = true;
-      }
+      const height = thickness * pixelsPerMeter;
+      const top = start * pixelsPerMeter;
+      const isThin = height < MIN_LABEL_HEIGHT;
+      const needsCallout = isThin && thickness < 0.5;
 
       layerHeights.push({
         layer,
-        top: currentTop,
+        top,
         height,
-        expanded,
+        isThin,
+        needsCallout,
       });
-      currentTop += height;
     }
 
-    const actualChartHeight = currentTop;
-
     const depthToY = (depth: number): number => {
-      for (const { layer, top, height } of layerHeights) {
-        const ls = parseFloat(layer.startDepth);
-        const le = parseFloat(layer.endDepth);
-        if (depth >= ls && depth <= le) {
-          const layerThickness = le - ls;
-          const positionInLayer = depth - ls;
-          return top + (positionInLayer / layerThickness) * height;
-        }
-      }
-
-      if (depth < parseFloat(sortedLayers[0].startDepth)) {
-        return (depth / totalDepth) * actualChartHeight;
-      }
-
-      const lastLayer = layerHeights[layerHeights.length - 1];
-      const lastEnd = parseFloat(lastLayer.layer.endDepth);
-      if (depth > lastEnd) {
-        const extraHeight = ((depth - lastEnd) / totalDepth) * actualChartHeight;
-        return lastLayer.top + lastLayer.height + extraHeight;
-      }
-
-      return (depth / totalDepth) * actualChartHeight;
+      return depth * pixelsPerMeter;
     };
 
     const generateTickMarks = (): { depth: number; y: number; major: boolean }[] => {
       const ticks: { depth: number; y: number; major: boolean }[] = [];
       let interval = 1;
-      if (totalDepth > 50) interval = 5;
+      if (totalDepth > 100) interval = 10;
+      else if (totalDepth > 50) interval = 5;
       else if (totalDepth > 20) interval = 2;
 
       for (let d = 0; d <= totalDepth; d += interval) {
         ticks.push({ depth: d, y: depthToY(d), major: d % (interval * 5) === 0 });
       }
-      if (totalDepth % interval !== 0) {
+      if (Math.abs(totalDepth % interval) > 0.001) {
         ticks.push({ depth: totalDepth, y: depthToY(totalDepth), major: true });
       }
       return ticks;
@@ -365,12 +363,47 @@ export default function BoreholeChart({
 
     return {
       layerHeights,
-      chartHeight: actualChartHeight,
+      chartHeight: baseChartHeight,
       depthToY,
       tickMarks: generateTickMarks(),
       totalDepth,
+      pixelsPerMeter,
     };
   }, [valid, sortedLayers, holeDepth]);
+
+  const thinLayerCallouts = useMemo(() => {
+    if (!chartBase) return [];
+    const callouts: { layer: StratumLayer; y: number; index: number }[] = [];
+    let calloutIndex = 0;
+    for (const item of chartBase.layerHeights) {
+      if (item.needsCallout) {
+        callouts.push({
+          layer: item.layer,
+          y: item.top + item.height / 2,
+          index: calloutIndex,
+        });
+        calloutIndex++;
+      }
+    }
+    return callouts;
+  }, [chartBase]);
+
+  const sptMarkers = useMemo(() => {
+    if (!chartBase) return [];
+    return sortedSPT
+      .filter((spt) => {
+        const depth = parseFloat(spt.depth);
+        return !isNaN(depth) && depth >= 0 && depth <= holeDepth;
+      })
+      .map((spt) => ({
+        record: spt,
+        y: chartBase.depthToY(parseFloat(spt.depth)),
+      }));
+  }, [chartBase, sortedSPT, holeDepth]);
+
+  const chartData = chartBase
+    ? { ...chartBase, thinLayerCallouts, sptMarkers }
+    : null;
 
   const handlePrint = () => {
     window.print();
@@ -385,7 +418,9 @@ export default function BoreholeChart({
       <div className="chart-header">
         <div className="chart-title">
           <h3>钻孔柱状图 · {boreholeId}</h3>
-          <span className="chart-subtitle">孔深 {holeDepth}m · 共 {sortedLayers.length} 层</span>
+          <span className="chart-subtitle">
+            孔深 {holeDepth}m · 共 {sortedLayers.length} 层 · 按真实深度比例绘制
+          </span>
         </div>
         <div className="chart-actions">
           <button className="print-btn" onClick={handlePrint}>
@@ -394,13 +429,17 @@ export default function BoreholeChart({
         </div>
       </div>
 
-      {(issues.length > 0) && (
+      {issues.length > 0 && (
         <div className={`data-issues ${hasBlockingErrors ? "has-critical-errors" : ""}`}>
           <div className="issues-header">
             <strong>⚠️ 数据检查结果</strong>
             <span className="issue-count">
-              {errorIssues.length > 0 && <span className="error-count">{errorIssues.length} 个错误</span>}
-              {warningIssues.length > 0 && <span className="warning-count">{warningIssues.length} 个警告</span>}
+              {errorIssues.length > 0 && (
+                <span className="error-count">{errorIssues.length} 个错误</span>
+              )}
+              {warningIssues.length > 0 && (
+                <span className="warning-count">{warningIssues.length} 个警告</span>
+              )}
             </span>
           </div>
           <ul className="issues-list">
@@ -423,130 +462,202 @@ export default function BoreholeChart({
         <div className="chart-empty">
           <div className="empty-icon">📊</div>
           <p>数据验证未通过，暂不绘制柱状图</p>
+          <p className="empty-hint">请检查上方列出的数据问题并修正</p>
         </div>
       ) : (
         <div className="chart-wrapper">
-          <div
-            className="borehole-chart"
-            style={{ height: `${chartData.chartHeight + 60}px` }}
-          >
-            <div className="chart-scale">
-              <div className="scale-title">深度(m)</div>
-              {chartData.tickMarks.map((tick, idx) => (
-                <div
-                  key={idx}
-                  className={`scale-tick ${tick.major ? "major" : "minor"}`}
-                  style={{ top: `${tick.y}px` }}
-                >
-                  <span className="tick-label">{tick.depth.toFixed(tick.depth % 1 === 0 ? 0 : 1)}</span>
-                  <span className="tick-line"></span>
-                </div>
-              ))}
-            </div>
-
-            <div className="chart-columns">
-              <div className="column column-depth">
-                <div className="column-header">层底深度</div>
-                <div className="column-body" style={{ height: `${chartData.chartHeight}px` }}>
-                  {chartData.layerHeights.map(({ layer, top, height }, idx) => (
-                    <div
-                      key={layer.id}
-                      className={`depth-cell ${chartData.layerHeights[idx].expanded ? "expanded" : ""}`}
-                      style={{ top: `${top}px`, height: `${height}px` }}
-                    >
-                      <span className="depth-value">{layer.endDepth}m</span>
-                      <span className="thickness-value">
-                        {(parseFloat(layer.endDepth) - parseFloat(layer.startDepth)).toFixed(2)}m
-                      </span>
-                    </div>
-                  ))}
-                </div>
+          <div className="chart-scroll-container">
+            <div
+              className="borehole-chart"
+              style={{ height: `${chartData.chartHeight + 40}px` }}
+            >
+              <div className="chart-scale">
+                <div className="scale-title">深度(m)</div>
+                {chartData.tickMarks.map((tick, idx) => (
+                  <div
+                    key={idx}
+                    className={`scale-tick ${tick.major ? "major" : "minor"}`}
+                    style={{ top: `${tick.y}px` }}
+                  >
+                    <span className="tick-label">
+                      {tick.depth.toFixed(tick.depth % 1 === 0 ? 0 : 1)}
+                    </span>
+                    <span className="tick-line"></span>
+                  </div>
+                ))}
               </div>
 
-              <div className="column column-lithology">
-                <div className="column-header">岩性柱状</div>
-                <div className="column-body" style={{ height: `${chartData.chartHeight}px` }}>
-                  {chartData.layerHeights.map(({ layer, top, height, expanded }, idx) => (
-                    <div
-                      key={layer.id}
-                      className={`lithology-cell ${expanded ? "expanded" : ""}`}
-                      style={{
-                        top: `${top}px`,
-                        height: `${height}px`,
-                        backgroundColor: getLithologyColor(layer.lithology),
-                        borderStyle: getLithologyPattern(layer.lithology),
-                      }}
-                    >
-                      <div className="lithology-pattern"></div>
-                      <div className="lithology-label">
-                        <span className="lithology-name">{layer.lithology}</span>
-                        {layer.density && <span className="lithology-density">{layer.density}</span>}
-                        {layer.soilColor && <span className="lithology-color">{layer.soilColor}</span>}
-                      </div>
-                      {expanded && <span className="expanded-indicator">≠</span>}
-                    </div>
-                  ))}
-
-                  {stableWaterLevel !== null && (
-                    <div
-                      className="water-level-line"
-                      style={{ top: `${chartData.depthToY(stableWaterLevel)}px` }}
-                    >
-                      <span className="water-level-label">
-                        地下水位 {stableWaterLevel}m
-                      </span>
-                      <span className="water-level-symbol">▼</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="column column-spt">
-                <div className="column-header">标贯试验</div>
-                <div className="column-body" style={{ height: `${chartData.chartHeight}px` }}>
-                  {sortedSPT.map((spt) => {
-                    const depth = parseFloat(spt.depth);
-                    const y = chartData.depthToY(depth);
-                    const blowCount = parseFloat(spt.blowCount);
-                    return (
+              <div className="chart-columns">
+                <div className="column column-depth">
+                  <div className="column-header">层底深度</div>
+                  <div
+                    className="column-body"
+                    style={{ height: `${chartData.chartHeight}px` }}
+                  >
+                    {chartData.layerHeights.map(({ layer, top, height, isThin }, idx) => (
                       <div
-                        key={spt.id}
-                        className={`spt-marker ${spt.isAbnormal ? "abnormal" : ""}`}
-                        style={{ top: `${y}px` }}
+                        key={layer.id}
+                        className={`depth-cell ${isThin ? "thin-layer" : ""}`}
+                        style={{ top: `${top}px`, height: `${height}px` }}
                       >
-                        <span className="spt-depth">{spt.depth}m</span>
-                        <span className={`spt-blow ${spt.isAbnormal ? "abnormal" : ""}`}>
-                          {isNaN(blowCount) ? spt.blowCount : blowCount}击
-                        </span>
-                        {spt.isAbnormal && <span className="spt-abnormal-badge">异常</span>}
+                        <span className="depth-value">{layer.endDepth}m</span>
+                        {!isThin && (
+                          <span className="thickness-value">
+                            {(
+                              parseFloat(layer.endDepth) - parseFloat(layer.startDepth)
+                            ).toFixed(2)}{" "}
+                            m
+                          </span>
+                        )}
                       </div>
-                    );
-                  })}
-                  {sortedSPT.length === 0 && (
-                    <div className="column-empty">无标贯记录</div>
-                  )}
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              <div className="column column-description">
-                <div className="column-header">岩性描述</div>
-                <div className="column-body" style={{ height: `${chartData.chartHeight}px` }}>
-                  {chartData.layerHeights.map(({ layer, top, height, expanded }, idx) => (
-                    <div
-                      key={layer.id}
-                      className={`description-cell ${expanded ? "expanded" : ""}`}
-                      style={{ top: `${top}px`, height: `${height}px` }}
-                    >
-                      <div className="description-layer-index">第{idx + 1}层</div>
-                      <div className="description-text">
-                        {layer.description || "无描述"}
+                <div className="column column-lithology">
+                  <div className="column-header">岩性柱状</div>
+                  <div
+                    className="column-body"
+                    style={{ height: `${chartData.chartHeight}px` }}
+                  >
+                    {chartData.layerHeights.map(
+                      ({ layer, top, height, isThin, needsCallout }, idx) => (
+                        <div
+                          key={layer.id}
+                          className={`lithology-cell ${isThin ? "thin-layer" : ""} ${
+                            needsCallout ? "has-callout" : ""
+                          }`}
+                          style={{
+                            top: `${top}px`,
+                            height: `${height}px`,
+                            backgroundColor: getLithologyColor(layer.lithology),
+                            borderStyle: getLithologyPattern(layer.lithology),
+                          }}
+                        >
+                          <div className="lithology-pattern"></div>
+                          {!isThin && (
+                            <div className="lithology-label">
+                              <span className="lithology-name">{layer.lithology}</span>
+                              {layer.density && (
+                                <span className="lithology-density">{layer.density}</span>
+                              )}
+                              {layer.soilColor && (
+                                <span className="lithology-color">{layer.soilColor}</span>
+                              )}
+                            </div>
+                          )}
+                          {needsCallout && (
+                            <span className="callout-marker">{idx + 1}</span>
+                          )}
+                        </div>
+                      )
+                    )}
+
+                    {stableWaterLevel !== null && (
+                      <div
+                        className="water-level-line"
+                        style={{ top: `${chartData.depthToY(stableWaterLevel)}px` }}
+                      >
+                        <span className="water-level-symbol">▼</span>
+                        <span className="water-level-label">
+                          稳定水位 {stableWaterLevel}m
+                        </span>
                       </div>
-                    </div>
-                  ))}
+                    )}
+                  </div>
+                </div>
+
+                <div className="column column-spt">
+                  <div className="column-header">标贯试验</div>
+                  <div
+                    className="column-body"
+                    style={{ height: `${chartData.chartHeight}px` }}
+                  >
+                    {chartData.sptMarkers.map(({ record, y }) => {
+                      const blowCount = parseFloat(record.blowCount);
+                      return (
+                        <div
+                          key={record.id}
+                          className={`spt-marker ${record.isAbnormal ? "abnormal" : ""}`}
+                          style={{ top: `${y}px` }}
+                        >
+                          <span className="spt-diamond">◆</span>
+                          <div className="spt-info">
+                            <span className="spt-depth">{record.depth}m</span>
+                            <span
+                              className={`spt-blow ${record.isAbnormal ? "abnormal" : ""}`}
+                            >
+                              {isNaN(blowCount) ? record.blowCount : blowCount}击
+                            </span>
+                          </div>
+                          {record.isAbnormal && (
+                            <span className="spt-abnormal-badge">异常</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {chartData.sptMarkers.length === 0 && (
+                      <div className="column-empty">无标贯记录</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="column column-description">
+                  <div className="column-header">岩性描述</div>
+                  <div
+                    className="column-body"
+                    style={{ height: `${chartData.chartHeight}px` }}
+                  >
+                    {chartData.layerHeights.map(
+                      ({ layer, top, height, isThin }, idx) => (
+                        <div
+                          key={layer.id}
+                          className={`description-cell ${isThin ? "thin-layer" : ""}`}
+                          style={{ top: `${top}px`, height: `${height}px` }}
+                        >
+                          {!isThin && (
+                            <>
+                              <div className="description-layer-index">第{idx + 1}层</div>
+                              <div className="description-text">
+                                {layer.description || "无描述"}
+                              </div>
+                            </>
+                          )}
+                          {isThin && (
+                            <div className="thin-layer-desc">
+                              <span className="thin-index">{idx + 1}</span>
+                              <span className="thin-name">{layer.lithology}</span>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
+
+          {chartData.thinLayerCallouts.length > 0 && (
+            <div className="thin-layer-callouts">
+              <div className="callouts-title">薄层说明（引出标注，不按比例）</div>
+              <div className="callouts-list">
+                {chartData.thinLayerCallouts.map(({ layer, index }) => (
+                  <div key={layer.id} className="callout-item">
+                    <span className="callout-num">{index + 1}</span>
+                    <span className="callout-depth">
+                      {layer.startDepth}~{layer.endDepth}m
+                    </span>
+                    <span className="callout-lithology">{layer.lithology}</span>
+                    {layer.density && <span className="callout-density">{layer.density}</span>}
+                    {layer.description && (
+                      <span className="callout-desc">{layer.description}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="chart-legend">
             <div className="legend-title">图例</div>
@@ -564,8 +675,8 @@ export default function BoreholeChart({
                 <span>异常数据</span>
               </div>
               <div className="legend-item">
-                <span className="legend-symbol expanded-symbol">≠</span>
-                <span>厚度非比例（薄层放大）</span>
+                <span className="legend-symbol scale-symbol">↕</span>
+                <span>真实深度比例</span>
               </div>
             </div>
           </div>
@@ -573,10 +684,18 @@ export default function BoreholeChart({
           {latestWaterLevel && (
             <div className="water-level-info">
               <strong>水位观测：</strong>
-              {latestWaterLevel.firstSeenLevel && <span>初见水位 {latestWaterLevel.firstSeenLevel}m</span>}
-              {latestWaterLevel.stableLevel && <span>｜稳定水位 {latestWaterLevel.stableLevel}m</span>}
-              {latestWaterLevel.observationTime && <span>｜观测时间 {latestWaterLevel.observationTime}</span>}
-              {latestWaterLevel.weatherRemark && <span>｜{latestWaterLevel.weatherRemark}</span>}
+              {latestWaterLevel.firstSeenLevel && (
+                <span>初见水位 {latestWaterLevel.firstSeenLevel}m</span>
+              )}
+              {latestWaterLevel.stableLevel && (
+                <span>｜稳定水位 {latestWaterLevel.stableLevel}m</span>
+              )}
+              {latestWaterLevel.observationTime && (
+                <span>｜观测时间 {latestWaterLevel.observationTime}</span>
+              )}
+              {latestWaterLevel.weatherRemark && (
+                <span>｜{latestWaterLevel.weatherRemark}</span>
+              )}
             </div>
           )}
         </div>
