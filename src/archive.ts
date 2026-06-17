@@ -693,8 +693,12 @@ export const previewImport = async (archive: ArchiveData): Promise<ImportPreview
 
     const dupCount = idCount.get(boreholeId) || 0;
     const isDupInArchive = dupCount > 1;
+    let duplicateIndex: number | undefined;
     if (isDupInArchive) {
       duplicateInArchiveCount++;
+      duplicateIndex = normalizedData.records
+        .filter((r) => r["钻孔编号"] === boreholeId)
+        .findIndex((r) => r === record);
     }
 
     const existingRecord = currentRecordMap.get(boreholeId);
@@ -716,10 +720,19 @@ export const previewImport = async (archive: ArchiveData): Promise<ImportPreview
     }
 
     if (isDupInArchive) {
-      const idx = [...normalizedData.records]
-        .filter((r) => r["钻孔编号"] === boreholeId)
-        .findIndex((r) => r === record);
-      detailParts.unshift(`归档内重复(#${idx + 1}/${dupCount})`);
+      detailParts.unshift(`归档内重复(#${(duplicateIndex ?? 0) + 1}/${dupCount})`);
+      detailParts.push("需整理后重新导入");
+      unrecognizedCount++;
+      boreholeItems.push({
+        boreholeId,
+        status: "unrecognized",
+        details: detailParts.join(" | "),
+        normalizationChanges: normChanges.length > 0 ? normChanges : undefined,
+        checkInfo,
+        isDuplicateInArchive: true,
+        duplicateIndex,
+      });
+      continue;
     }
 
     if (!existingRecord) {
@@ -730,10 +743,7 @@ export const previewImport = async (archive: ArchiveData): Promise<ImportPreview
         details: detailParts.join(" | "),
         normalizationChanges: normChanges.length > 0 ? normChanges : undefined,
         checkInfo,
-        isDuplicateInArchive: isDupInArchive,
-        duplicateIndex: isDupInArchive
-          ? [...normalizedData.records].filter((r) => r["钻孔编号"] === boreholeId).findIndex((r) => r === record)
-          : undefined,
+        isDuplicateInArchive: false,
       });
     } else {
       const conflictFields: string[] = [];
@@ -788,7 +798,7 @@ export const previewImport = async (archive: ArchiveData): Promise<ImportPreview
           details: `存在 ${conflictFields.length} 处差异：${conflictFields.join("、")} | ${detailParts.join(" | ")}`,
           normalizationChanges: normChanges.length > 0 ? normChanges : undefined,
           checkInfo,
-          isDuplicateInArchive: isDupInArchive,
+          isDuplicateInArchive: false,
         });
       } else {
         overwriteCount++;
@@ -798,7 +808,7 @@ export const previewImport = async (archive: ArchiveData): Promise<ImportPreview
           details: `数据内容一致，将覆盖更新 | ${detailParts.join(" | ")}`,
           normalizationChanges: normChanges.length > 0 ? normChanges : undefined,
           checkInfo,
-          isDuplicateInArchive: isDupInArchive,
+          isDuplicateInArchive: false,
         });
       }
     }
@@ -882,9 +892,22 @@ export const applyImport = async (
   try {
     for (const item of previewResult.boreholes) {
       const boreholeId = item.boreholeId;
+      const itemKey = item.duplicateIndex === undefined
+        ? `${boreholeId}:${item.status}`
+        : `${boreholeId}:${item.status}:${item.duplicateIndex}`;
 
-      if (processedIds.has(boreholeId + ":" + item.status)) {
+      if (processedIds.has(itemKey)) {
         skippedCount++;
+        continue;
+      }
+
+      if (item.isDuplicateInArchive) {
+        warnings.push(`归档内重复钻孔 ${boreholeId} 已跳过，请整理归档后重新导入`);
+        skippedCount++;
+        processedIds.add(itemKey);
+        progress.current = processedIds.size;
+        progress.processedBoreholeIds = Array.from(processedIds);
+        saveImportProgress(progress);
         continue;
       }
 
@@ -895,7 +918,7 @@ export const applyImport = async (
 
       if (!shouldProcess) {
         skippedCount++;
-        processedIds.add(boreholeId + ":" + item.status);
+        processedIds.add(itemKey);
         progress.current = processedIds.size;
         progress.processedBoreholeIds = Array.from(processedIds);
         saveImportProgress(progress);
@@ -950,12 +973,8 @@ export const applyImport = async (
       if (item.status === "conflict") {
         warnings.push(`已处理冲突钻孔：${boreholeId}${options.preserveChecked ? "（保留本地已校核数据）" : ""}`);
       }
-      if (item.isDuplicateInArchive) {
-        warnings.push(`归档内重复钻孔 ${boreholeId} 已按顺序导入`);
-      }
-
       importedCount++;
-      processedIds.add(boreholeId + ":" + item.status);
+      processedIds.add(itemKey);
       progress.current = processedIds.size;
       progress.processedBoreholeIds = Array.from(processedIds);
       saveImportProgress(progress);

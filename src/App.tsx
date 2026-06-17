@@ -572,12 +572,39 @@ function App() {
     if (!valid || !editingLayerId || !selectedBorehole) return;
     const { hasOverlap } = checkOverlapAndGaps();
     if (hasOverlap) { setLayerValidationMessage("该层与现有分层深度重叠，请调整深度范围"); return; }
-    setBoreholeLayers(prev => ({ ...prev, [selectedBorehole]: prev[selectedBorehole].map(l => l.id === editingLayerId ? { ...layerForm, id: editingLayerId } : l) }));
+    setBoreholeLayers(prev => ({
+      ...prev,
+      [selectedBorehole]: prev[selectedBorehole].map(l => {
+        if (l.id !== editingLayerId) return l;
+        if (isCheckMode) {
+          return {
+            ...l,
+            description: layerForm.description,
+            isChecked: true,
+            checkedBy: currentRole,
+            checkedAt: new Date().toISOString(),
+            checkRemark: layerForm.description,
+          };
+        }
+        return { ...l, ...layerForm, id: editingLayerId };
+      })
+    }));
     setLayerForm(emptyLayerForm); setEditingLayerId(null); setLayerErrors({}); setLayerValidationMessage("");
   };
 
   const handleEditLayer = (layer: StratumLayer) => {
-    setLayerForm({ startDepth: layer.startDepth, endDepth: layer.endDepth, lithology: layer.lithology, soilColor: layer.soilColor, density: layer.density, description: layer.description });
+    setLayerForm({
+      startDepth: layer.startDepth,
+      endDepth: layer.endDepth,
+      lithology: layer.lithology,
+      soilColor: layer.soilColor,
+      density: layer.density,
+      description: layer.description,
+      isChecked: layer.isChecked,
+      checkedBy: layer.checkedBy,
+      checkedAt: layer.checkedAt,
+      checkRemark: layer.checkRemark,
+    });
     setEditingLayerId(layer.id); setLayerErrors({}); setLayerValidationMessage("");
   };
 
@@ -626,12 +653,38 @@ function App() {
     const { valid: depthValid, message, layer } = checkDepthInLayers(depth);
     if (!depthValid) { setSPTValidationMessage(message); return; }
     if (!layer) return;
-    setSPTRecords(prev => ({ ...prev, [selectedBorehole]: prev[selectedBorehole].map(r => r.id === editingSPTId ? { ...sptForm, id: editingSPTId, layerId: layer.id } : r) }));
+    setSPTRecords(prev => ({
+      ...prev,
+      [selectedBorehole]: prev[selectedBorehole].map(r => {
+        if (r.id !== editingSPTId) return r;
+        if (isCheckMode) {
+          return {
+            ...r,
+            isAbnormal: sptForm.isAbnormal,
+            remark: sptForm.remark,
+            isChecked: true,
+            checkedBy: currentRole,
+            checkedAt: new Date().toISOString(),
+            checkRemark: sptForm.remark,
+          };
+        }
+        return { ...r, ...sptForm, id: editingSPTId, layerId: layer.id };
+      })
+    }));
     setSPTForm(emptySPTForm); setEditingSPTId(null); setSPTErrors({}); setSPTValidationMessage("");
   };
 
   const handleEditSPTRecord = (record: SPTRecord) => {
-    setSPTForm({ depth: record.depth, blowCount: record.blowCount, isAbnormal: record.isAbnormal, remark: record.remark });
+    setSPTForm({
+      depth: record.depth,
+      blowCount: record.blowCount,
+      isAbnormal: record.isAbnormal,
+      remark: record.remark,
+      isChecked: record.isChecked,
+      checkedBy: record.checkedBy,
+      checkedAt: record.checkedAt,
+      checkRemark: record.checkRemark,
+    });
     setEditingSPTId(record.id); setSPTErrors({}); setSPTValidationMessage("");
   };
 
