@@ -1054,29 +1054,17 @@ export const previewImport = async (archive: ArchiveData): Promise<ImportPreview
         isDuplicateInArchive: false,
       });
     } else {
-      const conflictFields: string[] = [];
-
-      if (existingRecord["孔深"] !== record["孔深"]) conflictFields.push("孔深");
-      if (existingRecord["岩性分类"] !== record["岩性分类"]) conflictFields.push("岩性分类");
-      if (existingRecord["岩性描述"] !== record["岩性描述"]) conflictFields.push("岩性描述");
-      if (existingRecord["土色"] !== record["土色"]) conflictFields.push("土色");
-      if (existingRecord["地下水位"] !== record["地下水位"]) conflictFields.push("地下水位");
-
       const existingLayers = currentData?.boreholeLayers[boreholeId] || [];
       const newLayers = normalizedData.boreholeLayers[boreholeId] || [];
-      if (existingLayers.length !== newLayers.length) conflictFields.push("分层数量");
 
       const existingSPT = currentData?.sptRecords[boreholeId] || [];
       const newSPT = normalizedData.sptRecords[boreholeId] || [];
-      if (existingSPT.length !== newSPT.length) conflictFields.push("标贯数量");
 
       const existingSampling = currentData?.samplingRecords[boreholeId] || [];
       const newSampling = normalizedData.samplingRecords[boreholeId] || [];
-      if (existingSampling.length !== newSampling.length) conflictFields.push("取样数量");
 
       const existingWater = currentData?.waterLevelRecords[boreholeId] || [];
       const newWater = normalizedData.waterLevelRecords[boreholeId] || [];
-      if (existingWater.length !== newWater.length) conflictFields.push("水位观测数量");
 
       if (checkInfo) {
         const localCheckInfo = computeBoreholeCheckInfo(
@@ -1097,20 +1085,37 @@ export const previewImport = async (archive: ArchiveData): Promise<ImportPreview
         }
       }
 
-      if (conflictFields.length > 0) {
+      const conflictDetails = computeBoreholeConflictDetails(
+        existingRecord,
+        record,
+        existingLayers,
+        newLayers,
+        existingSPT,
+        newSPT,
+        existingSampling,
+        newSampling,
+        existingWater,
+        newWater
+      );
+
+      const conflictFields: string[] = [];
+      (Object.keys(conflictDetails.categories) as ConflictCategory[]).forEach((cat) => {
+        const cd = conflictDetails.categories[cat];
+        if (!cd.hasConflict) return;
+        const label = CATEGORY_LABELS[cat];
+        if (cd.addedCount > 0 || cd.removedCount > 0) {
+          if (cd.modifiedCount > 0) {
+            conflictFields.push(`${label}(+${cd.addedCount}/-${cd.removedCount}/改${cd.modifiedCount})`);
+          } else {
+            conflictFields.push(`${label}(+${cd.addedCount}/-${cd.removedCount})`);
+          }
+        } else if (cd.modifiedCount > 0) {
+          conflictFields.push(`${label}(改${cd.modifiedCount})`);
+        }
+      });
+
+      if (conflictDetails.hasConflict) {
         conflictCount++;
-        const conflictDetails = computeBoreholeConflictDetails(
-          existingRecord,
-          record,
-          existingLayers,
-          newLayers,
-          existingSPT,
-          newSPT,
-          existingSampling,
-          newSampling,
-          existingWater,
-          newWater
-        );
 
         const defaultResolutions: Partial<Record<ConflictCategory, ConflictResolution>> = {};
         (Object.keys(conflictDetails.categories) as ConflictCategory[]).forEach((cat) => {
@@ -1135,7 +1140,7 @@ export const previewImport = async (archive: ArchiveData): Promise<ImportPreview
           boreholeId,
           status: "conflict",
           conflictFields,
-          details: `存在 ${conflictFields.length} 处差异：${categorySummary.join(" | ")} | ${detailParts.join(" | ")}`,
+          details: `存在差异：${categorySummary.join(" | ")} | ${detailParts.join(" | ")}`,
           normalizationChanges: normChanges.length > 0 ? normChanges : undefined,
           checkInfo,
           isDuplicateInArchive: false,
