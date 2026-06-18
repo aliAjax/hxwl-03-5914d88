@@ -36,6 +36,7 @@ import {
 import BoreholeChart from "./components/BoreholeChart";
 import MultiBoreholeChart from "./components/MultiBoreholeChart";
 import ReviewWorkbench from "./components/ReviewWorkbench";
+import PrintReport from "./components/PrintReport";
 
 const lithologyOptions = ["黏土", "粉质黏土", "粉土", "粉砂", "细砂", "中砂", "粗砂", "卵石", "圆砾", "强风化岩", "中风化岩", "微风化岩"];
 const soilColorOptions = ["褐黄色", "黄褐色", "灰黄色", "灰白色", "灰色", "灰褐色", "紫红色", "杂色"];
@@ -285,6 +286,7 @@ function App() {
   });
   const [showPreview, setShowPreview] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [showPrintReport, setShowPrintReport] = useState(false);
 
   const [boreholeLayers, setBoreholeLayers] = useState<BoreholeLayers>({});
   const [selectedBorehole, setSelectedBorehole] = useState<string | null>(null);
@@ -2322,6 +2324,14 @@ function App() {
               >
                 {permissions.canExportSummary ? "导出摘要" : "无权限导出"}
               </button>
+              <button
+                className={`primary-action ${!permissions.canExportSummary ? "btn-disabled" : ""}`}
+                onClick={permissions.canExportSummary ? () => setShowPrintReport(true) : undefined}
+                disabled={!permissions.canExportSummary}
+                title={!permissions.canExportSummary ? "当前角色无打印权限" : "生成面向项目负责人的打印报告"}
+              >
+                📋 打印报告
+              </button>
             </div>
           </div>
 
@@ -3114,6 +3124,15 @@ function App() {
             </div>
             <div className="modal-footer">
               <button className="secondary-btn" onClick={() => setShowPreview(false)}>关闭</button>
+              <button
+                className="secondary-btn"
+                onClick={() => {
+                  setShowPreview(false);
+                  setShowPrintReport(true);
+                }}
+              >
+                📋 生成打印报告
+              </button>
               <button className="primary-action" onClick={handleCopySummary}>
                 {copySuccess ? "✓ 已复制" : "复制文本"}
               </button>
@@ -3615,6 +3634,24 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {showPrintReport && (
+        <PrintReport
+          projectId={project.id}
+          projectTitle={project.title}
+          filteredRecords={filteredRecords}
+          boreholeLayers={boreholeLayers}
+          sptRecords={sptRecords}
+          samplingRecords={samplingRecords}
+          waterLevelRecords={waterLevelRecords}
+          selectedBoreholesForCharts={selectedBoreholesForCompare}
+          getWaterLevelDisplayText={getWaterLevelDisplayText}
+          getLatestWaterLevelObservationText={getLatestWaterLevelObservationText}
+          getLatestStableWaterLevel={getLatestStableWaterLevel}
+          getLayerLithology={getLayerLithology}
+          onClose={() => setShowPrintReport(false)}
+        />
       )}
     </main>
   );
