@@ -38,6 +38,12 @@ import MultiBoreholeChart from "./components/MultiBoreholeChart";
 import ReviewWorkbench from "./components/ReviewWorkbench";
 import PrintReport from "./components/PrintReport";
 import QualityCheckPanel from "./components/QualityCheckPanel";
+import {
+  useLayerDepthValidation,
+  useSampleAttachmentValidation,
+  useWaterLevelDisplay,
+  useRecordFilter,
+} from "./hooks";
 
 const lithologyOptions = ["黏土", "粉质黏土", "粉土", "粉砂", "细砂", "中砂", "粗砂", "卵石", "圆砾", "强风化岩", "中风化岩", "微风化岩"];
 const soilColorOptions = ["褐黄色", "黄褐色", "灰黄色", "灰白色", "灰色", "灰褐色", "紫红色", "杂色"];
@@ -274,48 +280,17 @@ function App() {
   const [records, setRecords] = useState<DrillingRecord[]>([]);
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
-  const [filters, setFilters] = useState<{
-    lithology: string | null;
-    hasGap: boolean | null;
-    hasAbnormalSPT: boolean | null;
-    missingStableWaterLevel: boolean | null;
-  }>({
-    lithology: null,
-    hasGap: null,
-    hasAbnormalSPT: null,
-    missingStableWaterLevel: null,
-  });
   const [showPreview, setShowPreview] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [showPrintReport, setShowPrintReport] = useState(false);
 
   const [boreholeLayers, setBoreholeLayers] = useState<BoreholeLayers>({});
   const [selectedBorehole, setSelectedBorehole] = useState<string | null>(null);
-  const [layerForm, setLayerForm] = useState<Omit<StratumLayer, "id">>(emptyLayerForm);
-  const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
-  const [layerErrors, setLayerErrors] = useState<Partial<Record<keyof StratumLayer, string>>>({});
-  const [layerValidationMessage, setLayerValidationMessage] = useState<string>("");
-  const [gapMessage, setGapMessage] = useState<string>("");
-  const [adjacentLayerHint, setAdjacentLayerHint] = useState<string>("");
-  const [autoFilledStartDepth, setAutoFilledStartDepth] = useState<boolean>(false);
 
   const [sptRecords, setSPTRecords] = useState<BoreholeSPTRecords>({});
-  const [sptForm, setSPTForm] = useState<Omit<SPTRecord, "id" | "layerId">>(emptySPTForm);
-  const [editingSPTId, setEditingSPTId] = useState<string | null>(null);
-  const [sptErrors, setSPTErrors] = useState<Partial<Record<keyof SPTRecord, string>>>({});
-  const [sptValidationMessage, setSPTValidationMessage] = useState<string>("");
-
   const [samplingRecords, setSamplingRecords] = useState<BoreholeSamplingRecords>({});
-  const [samplingForm, setSamplingForm] = useState<Omit<SamplingRecord, "id" | "layerId">>(emptySamplingForm);
-  const [editingSamplingId, setEditingSamplingId] = useState<string | null>(null);
-  const [samplingErrors, setSamplingErrors] = useState<Partial<Record<keyof SamplingRecord, string>>>({});
-  const [samplingValidationMessage, setSamplingValidationMessage] = useState<string>("");
-
   const [waterLevelRecords, setWaterLevelRecords] = useState<BoreholeWaterLevelRecords>({});
-  const [waterLevelForm, setWaterLevelForm] = useState<Omit<WaterLevelRecord, "id">>(emptyWaterLevelForm);
-  const [editingWaterLevelId, setEditingWaterLevelId] = useState<string | null>(null);
-  const [waterLevelErrors, setWaterLevelErrors] = useState<Partial<Record<keyof WaterLevelRecord, string>>>({});
-  const [waterLevelValidationMessage, setWaterLevelValidationMessage] = useState<string>("");
+
   const [activeMainView, setActiveMainView] = useState<"borehole" | "review" | "quality">("borehole");
   const [activeEditorTab, setActiveEditorTab] = useState<"editor" | "chart">("editor");
   const [chartViewMode, setChartViewMode] = useState<"single" | "compare">("single");
@@ -348,11 +323,6 @@ function App() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [expandedConflictBoreholes, setExpandedConflictBoreholes] = useState<Set<string>>(new Set());
 
-  const currentLayers = useMemo(() => {
-    if (!selectedBorehole) return [];
-    return boreholeLayers[selectedBorehole] || [];
-  }, [boreholeLayers, selectedBorehole]);
-
   const selectedRecord = useMemo(() => {
     if (!selectedBorehole) return null;
     return records.find(r => r["钻孔编号"] === selectedBorehole) || null;
@@ -363,646 +333,122 @@ function App() {
     return parseFloat(selectedRecord["孔深"]) || 0;
   }, [selectedRecord]);
 
-  const sortedLayers = useMemo(() => {
-    return [...currentLayers].sort((a, b) => parseFloat(a.startDepth) - parseFloat(b.startDepth));
-  }, [currentLayers]);
+  const {
+    filters,
+    setFilters,
+    hasActiveFilters,
+    filteredRecords,
+    hasLayerGap,
+    hasAbnormalSPT,
+    isMissingStableWaterLevel,
+  } = useRecordFilter({ records, boreholeLayers, sptRecords, waterLevelRecords });
 
-  const currentSPTRecords = useMemo(() => {
-    if (!selectedBorehole) return [];
-    return sptRecords[selectedBorehole] || [];
-  }, [sptRecords, selectedBorehole]);
+  const {
+    layerForm,
+    setLayerForm,
+    editingLayerId,
+    setEditingLayerId,
+    layerErrors,
+    setLayerErrors,
+    layerValidationMessage,
+    setLayerValidationMessage,
+    gapMessage,
+    setGapMessage,
+    adjacentLayerHint,
+    autoFilledStartDepth,
+    setAutoFilledStartDepth,
+    currentLayers,
+    sortedLayers,
+    findLayerByDepth,
+    getLayerLithology,
+    validateLayerForm,
+    checkOverlapAndGaps,
+    checkDepthInLayers,
+    handleLayerInputChange,
+    prepareNewLayerForm,
+    handleAddLayer,
+    handleUpdateLayer,
+    handleEditLayer,
+    handleDeleteLayer,
+    handleCancelEdit,
+    checkAdjacentLayerImpact,
+    handleUpdateLayerCheck,
+  } = useLayerDepthValidation(boreholeLayers, setBoreholeLayers, selectedBorehole, holeDepth, isCheckMode, currentRole);
 
-  const sortedSPTRecords = useMemo(() => {
-    return [...currentSPTRecords].sort((a, b) => parseFloat(a.depth) - parseFloat(b.depth));
-  }, [currentSPTRecords]);
+  const {
+    sptForm,
+    setSPTForm,
+    editingSPTId,
+    setEditingSPTId,
+    sptErrors,
+    setSPTErrors,
+    sptValidationMessage,
+    setSPTValidationMessage,
+    samplingForm,
+    setSamplingForm,
+    editingSamplingId,
+    setEditingSamplingId,
+    samplingErrors,
+    setSamplingErrors,
+    samplingValidationMessage,
+    setSamplingValidationMessage,
+    sortedSPTRecords,
+    sortedSamplingRecords,
+    sptStats,
+    samplingStats,
+    getBoreholeMaxSPT,
+    validateSPTForm,
+    validateSamplingForm,
+    handleSPTInputChange,
+    handleAddSPTRecord,
+    handleUpdateSPTRecord,
+    handleEditSPTRecord,
+    handleDeleteSPTRecord,
+    handleCancelSPTEdit,
+    handleUpdateSPTCheck,
+    handleSamplingInputChange,
+    handleAddSamplingRecord,
+    handleUpdateSamplingRecord,
+    handleEditSamplingRecord,
+    handleDeleteSamplingRecord,
+    handleCancelSamplingEdit,
+    resetFormsOnBoreholeChange: resetSampleFormsOnBoreholeChange,
+  } = useSampleAttachmentValidation(
+    sptRecords,
+    setSPTRecords,
+    samplingRecords,
+    setSamplingRecords,
+    selectedBorehole,
+    isCheckMode,
+    currentRole,
+    checkDepthInLayers,
+    sortedLayers
+  );
 
-  const currentSamplingRecords = useMemo(() => {
-    if (!selectedBorehole) return [];
-    return samplingRecords[selectedBorehole] || [];
-  }, [samplingRecords, selectedBorehole]);
-
-  const sortedSamplingRecords = useMemo(() => {
-    return [...currentSamplingRecords].sort((a, b) => parseFloat(a.depth) - parseFloat(b.depth));
-  }, [currentSamplingRecords]);
-
-  const currentWaterLevelRecords = useMemo(() => {
-    if (!selectedBorehole) return [];
-    return waterLevelRecords[selectedBorehole] || [];
-  }, [waterLevelRecords, selectedBorehole]);
-
-  const sortedWaterLevelRecords = useMemo(() => {
-    return [...currentWaterLevelRecords].sort((a, b) => {
-      const timeA = a.observationTime ? new Date(a.observationTime).getTime() : 0;
-      const timeB = b.observationTime ? new Date(b.observationTime).getTime() : 0;
-      return timeB - timeA;
-    });
-  }, [currentWaterLevelRecords]);
-
-  const latestWaterLevel = useMemo(() => {
-    if (sortedWaterLevelRecords.length === 0) return null;
-    return sortedWaterLevelRecords[0];
-  }, [sortedWaterLevelRecords]);
-
-  const latestStableWaterLevel = useMemo(() => {
-    for (const record of sortedWaterLevelRecords) {
-      if (record.stableLevel && record.stableLevel.trim()) {
-        return record;
-      }
-    }
-    return null;
-  }, [sortedWaterLevelRecords]);
-
-  const getLatestStableWaterLevel = useCallback((boreholeId: string): string => {
-    const records = waterLevelRecords[boreholeId] || [];
-    const sorted = [...records].sort((a, b) => {
-      const timeA = a.observationTime ? new Date(a.observationTime).getTime() : 0;
-      const timeB = b.observationTime ? new Date(b.observationTime).getTime() : 0;
-      return timeB - timeA;
-    });
-    for (const record of sorted) {
-      if (record.stableLevel && record.stableLevel.trim()) {
-        return record.stableLevel;
-      }
-    }
-    return "";
-  }, [waterLevelRecords]);
-
-  const getWaterLevelDisplayText = useCallback((boreholeId: string): string => {
-    const records = waterLevelRecords[boreholeId] || [];
-    if (records.length === 0) return "未观测";
-    const sorted = [...records].sort((a, b) => {
-      const timeA = a.observationTime ? new Date(a.observationTime).getTime() : 0;
-      const timeB = b.observationTime ? new Date(b.observationTime).getTime() : 0;
-      return timeB - timeA;
-    });
-    for (const record of sorted) {
-      if (record.stableLevel && record.stableLevel.trim()) {
-        return record.stableLevel + "m";
-      }
-    }
-    if (sorted[0].firstSeenLevel && sorted[0].firstSeenLevel.trim()) {
-      return `初见${sorted[0].firstSeenLevel}m`;
-    }
-    return "未观测";
-  }, [waterLevelRecords]);
-
-  const hasLayerGap = useCallback((boreholeId: string): boolean => {
-    const layers = boreholeLayers[boreholeId] || [];
-    if (layers.length === 0) return false;
-    const record = records.find(r => r["钻孔编号"] === boreholeId);
-    if (!record) return false;
-    const holeDepth = parseFloat(record["孔深"]) || 0;
-    if (holeDepth === 0) return false;
-    const sorted = [...layers].sort((a, b) => parseFloat(a.startDepth) - parseFloat(b.startDepth));
-    let prevEnd = 0;
-    for (const layer of sorted) {
-      const ls = parseFloat(layer.startDepth);
-      if (ls > prevEnd + 0.001) return true;
-      prevEnd = Math.max(prevEnd, parseFloat(layer.endDepth));
-    }
-    if (prevEnd < holeDepth - 0.001) return true;
-    return false;
-  }, [boreholeLayers, records]);
-
-  const hasAbnormalSPT = useCallback((boreholeId: string): boolean => {
-    const bhSPT = sptRecords[boreholeId] || [];
-    return bhSPT.some(spt => spt.isAbnormal);
-  }, [sptRecords]);
-
-  const isMissingStableWaterLevel = useCallback((boreholeId: string): boolean => {
-    const bhWL = waterLevelRecords[boreholeId] || [];
-    if (bhWL.length === 0) return true;
-    return !bhWL.some(wl => wl.stableLevel && wl.stableLevel.trim());
-  }, [waterLevelRecords]);
-
-  const getLatestWaterLevelObservationText = useCallback((boreholeId: string): string => {
-    const records = waterLevelRecords[boreholeId] || [];
-    if (records.length === 0) return "未观测";
-    const [latest] = [...records].sort((a, b) => {
-      const timeA = a.observationTime ? new Date(a.observationTime).getTime() : 0;
-      const timeB = b.observationTime ? new Date(b.observationTime).getTime() : 0;
-      return timeB - timeA;
-    });
-    if (!latest) return "未观测";
-    if (latest.stableLevel && latest.stableLevel.trim()) {
-      return `稳定${latest.stableLevel}m`;
-    }
-    if (latest.firstSeenLevel && latest.firstSeenLevel.trim()) {
-      return `初见${latest.firstSeenLevel}m·待稳定`;
-    }
-    return "未观测";
-  }, [waterLevelRecords]);
-
-  const findLayerByDepth = useCallback((depth: number): StratumLayer | null => {
-    for (const layer of sortedLayers) {
-      const start = parseFloat(layer.startDepth);
-      const end = parseFloat(layer.endDepth);
-      if (depth >= start && depth <= end) {
-        return layer;
-      }
-    }
-    return null;
-  }, [sortedLayers]);
-
-  const getLayerLithology = useCallback((layerId: string): string => {
-    const layer = sortedLayers.find(l => l.id === layerId);
-    return layer ? layer.lithology : "-";
-  }, [sortedLayers]);
-
-  const sptStats = useMemo(() => {
-    const recs = sortedSPTRecords;
-    if (recs.length === 0) {
-      return { maxBlow: 0, abnormalCount: 0, totalCount: 0, maxBlowLithology: "-" };
-    }
-    let maxBlow = 0;
-    let maxBlowLayerId = "";
-    let abnormalCount = 0;
-    for (const record of recs) {
-      const blow = parseFloat(record.blowCount);
-      if (!isNaN(blow) && blow > maxBlow) {
-        maxBlow = blow;
-        maxBlowLayerId = record.layerId;
-      }
-      if (record.isAbnormal) abnormalCount++;
-    }
-    const maxBlowLayer = sortedLayers.find(l => l.id === maxBlowLayerId);
-    return { maxBlow, abnormalCount, totalCount: recs.length, maxBlowLithology: maxBlowLayer ? maxBlowLayer.lithology : "-" };
-  }, [sortedSPTRecords, sortedLayers]);
-
-  const samplingStats = useMemo(() => {
-    const recs = sortedSamplingRecords;
-    if (recs.length === 0) {
-      return { totalCount: 0, typeBreakdown: {} as Record<string, number> };
-    }
-    const typeBreakdown: Record<string, number> = {};
-    for (const r of recs) {
-      typeBreakdown[r.sampleType] = (typeBreakdown[r.sampleType] || 0) + 1;
-    }
-    return { totalCount: recs.length, typeBreakdown };
-  }, [sortedSamplingRecords]);
-
-  const checkDepthInLayers = useCallback((depth: number): { valid: boolean; message: string; layer: StratumLayer | null } => {
-    if (sortedLayers.length === 0) {
-      return { valid: false, message: "当前钻孔暂无地层分层数据，请先添加分层", layer: null };
-    }
-    const layer = findLayerByDepth(depth);
-    if (!layer) {
-      const minDepth = parseFloat(sortedLayers[0].startDepth);
-      const maxDepth = parseFloat(sortedLayers[sortedLayers.length - 1].endDepth);
-      if (depth < minDepth) {
-        return { valid: false, message: `深度 ${depth}m 位于地层之上（最浅分层起始于 ${minDepth}m），请检查深度`, layer: null };
-      } else if (depth > maxDepth) {
-        return { valid: false, message: `深度 ${depth}m 超出最深分层（最深分层终止于 ${maxDepth}m），请检查深度`, layer: null };
-      } else {
-        return { valid: false, message: `深度 ${depth}m 落在分层缺口处，请先补全该深度范围的分层`, layer: null };
-      }
-    }
-    return { valid: true, message: "", layer };
-  }, [sortedLayers, findLayerByDepth]);
-
-  const validateLayerForm = useCallback((): { valid: boolean; errors: Partial<Record<keyof StratumLayer, string>> } => {
-    const errs: Partial<Record<keyof StratumLayer, string>> = {};
-    if (!layerForm.startDepth.trim()) { errs.startDepth = "起始深度不能为空"; }
-    else if (isNaN(parseFloat(layerForm.startDepth)) || parseFloat(layerForm.startDepth) < 0) { errs.startDepth = "起始深度必须为非负数"; }
-    if (!layerForm.endDepth.trim()) { errs.endDepth = "终止深度不能为空"; }
-    else if (isNaN(parseFloat(layerForm.endDepth)) || parseFloat(layerForm.endDepth) < 0) { errs.endDepth = "终止深度必须为非负数"; }
-    if (!layerForm.lithology.trim()) { errs.lithology = "岩性不能为空"; }
-    if (!layerForm.soilColor.trim()) { errs.soilColor = "土色不能为空"; }
-    if (!layerForm.density.trim()) { errs.density = "密实度/状态不能为空"; }
-    const start = parseFloat(layerForm.startDepth);
-    const end = parseFloat(layerForm.endDepth);
-    if (!isNaN(start) && !isNaN(end) && start >= end) { errs.endDepth = "终止深度必须大于起始深度"; }
-    if (!isNaN(end) && holeDepth > 0 && end > holeDepth) { errs.endDepth = `终止深度不能超过钻孔深度(${holeDepth}m)`; }
-    return { valid: Object.keys(errs).length === 0, errors: errs };
-  }, [layerForm, holeDepth]);
-
-  const checkOverlapAndGaps = useCallback(() => {
-    const layers = [...currentLayers];
-    if (editingLayerId) {
-      const idx = layers.findIndex(l => l.id === editingLayerId);
-      if (idx !== -1) layers.splice(idx, 1);
-    }
-    const start = parseFloat(layerForm.startDepth);
-    const end = parseFloat(layerForm.endDepth);
-    if (isNaN(start) || isNaN(end)) return { hasOverlap: false, gaps: [] as string[] };
-    let hasOverlap = false;
-    for (const layer of layers) {
-      const ls = parseFloat(layer.startDepth);
-      const le = parseFloat(layer.endDepth);
-      if (start < le && end > ls) { hasOverlap = true; break; }
-    }
-    const allLayers = [...layers, { ...layerForm, id: "temp" } as StratumLayer].sort((a, b) => parseFloat(a.startDepth) - parseFloat(b.startDepth));
-    const gaps: string[] = [];
-    let prevEnd = 0;
-    for (const layer of allLayers) {
-      const ls = parseFloat(layer.startDepth);
-      if (ls > prevEnd + 0.001) { gaps.push(`${prevEnd.toFixed(2)}m ~ ${ls.toFixed(2)}m`); }
-      prevEnd = Math.max(prevEnd, parseFloat(layer.endDepth));
-    }
-    if (holeDepth > 0 && prevEnd < holeDepth - 0.001) { gaps.push(`${prevEnd.toFixed(2)}m ~ ${holeDepth.toFixed(2)}m`); }
-    return { hasOverlap, gaps };
-  }, [currentLayers, editingLayerId, layerForm, holeDepth]);
-
-  const getAdjacentLayers = useCallback((layerId: string | null, startDepth: string, endDepth: string): { prevLayer: StratumLayer | null; nextLayer: StratumLayer | null } => {
-    const sorted = sortedLayers;
-    if (layerId) {
-      const currentIndex = sorted.findIndex(layer => layer.id === layerId);
-      if (currentIndex !== -1) {
-        return {
-          prevLayer: currentIndex > 0 ? sorted[currentIndex - 1] : null,
-          nextLayer: currentIndex < sorted.length - 1 ? sorted[currentIndex + 1] : null,
-        };
-      }
-    }
-    const start = parseFloat(startDepth);
-    const end = parseFloat(endDepth);
-    let prevLayer: StratumLayer | null = null;
-    let nextLayer: StratumLayer | null = null;
-    for (const layer of sorted) {
-      if (layerId && layer.id === layerId) continue;
-      const ls = parseFloat(layer.startDepth);
-      const le = parseFloat(layer.endDepth);
-      if (le <= start + 0.001) {
-        if (!prevLayer || ls > parseFloat(prevLayer.startDepth)) {
-          prevLayer = layer;
-        }
-      }
-      if (ls >= end - 0.001) {
-        if (!nextLayer || ls < parseFloat(nextLayer.startDepth)) {
-          nextLayer = layer;
-        }
-      }
-    }
-    return { prevLayer, nextLayer };
-  }, [sortedLayers]);
-
-  const checkAdjacentLayerImpact = useCallback((formSnapshot: Omit<StratumLayer, "id"> = layerForm) => {
-    const { prevLayer, nextLayer } = getAdjacentLayers(editingLayerId, formSnapshot.startDepth, formSnapshot.endDepth);
-    const start = parseFloat(formSnapshot.startDepth);
-    const end = parseFloat(formSnapshot.endDepth);
-    const hints: string[] = [];
-    if (isNaN(start) || isNaN(end)) {
-      setAdjacentLayerHint("");
-      return;
-    }
-    if (!editingLayerId) {
-      if (prevLayer) {
-        const prevEnd = parseFloat(prevLayer.endDepth);
-        if (Math.abs(prevEnd - start) < 0.001) {
-          hints.push(`✅ 与上一层（${prevLayer.lithology} ${prevLayer.startDepth}~${prevLayer.endDepth}m）完美接续`);
-        } else if (start < prevEnd - 0.001) {
-          hints.push(`⚠️ 与上一层（${prevLayer.lithology} ${prevLayer.startDepth}~${prevLayer.endDepth}m）重叠 ${(prevEnd - start).toFixed(2)}m`);
-        } else {
-          hints.push(`💡 与上一层（${prevLayer.lithology} ${prevLayer.startDepth}~${prevLayer.endDepth}m）存在 ${(start - prevEnd).toFixed(2)}m 间隙`);
-        }
-      } else if (Math.abs(start) < 0.001) {
-        hints.push(`✅ 起始于地表 0m，接续正确`);
-      } else if (start > 0) {
-        hints.push(`💡 与地表存在 ${start.toFixed(2)}m 间隙`);
-      }
-    } else {
-      if (prevLayer) {
-        const prevEnd = parseFloat(prevLayer.endDepth);
-        if (Math.abs(prevEnd - start) > 0.001) {
-          if (start < prevEnd - 0.001) {
-            hints.push(`⚠️ 与上一层（${prevLayer.lithology} ${prevLayer.startDepth}~${prevLayer.endDepth}m）重叠 ${(prevEnd - start).toFixed(2)}m`);
-          } else {
-            hints.push(`💡 与上一层（${prevLayer.lithology} ${prevLayer.startDepth}~${prevLayer.endDepth}m）存在 ${(start - prevEnd).toFixed(2)}m 间隙`);
-          }
-        } else {
-          hints.push(`✅ 与上一层（${prevLayer.lithology}）完美接续`);
-        }
-      } else if (Math.abs(start) < 0.001) {
-        hints.push(`✅ 起始于地表 0m，接续正确`);
-      } else if (start > 0) {
-        hints.push(`💡 与地表存在 ${start.toFixed(2)}m 间隙`);
-      }
-      if (nextLayer) {
-        const nextStart = parseFloat(nextLayer.startDepth);
-        if (Math.abs(nextStart - end) > 0.001) {
-          if (end > nextStart + 0.001) {
-            hints.push(`⚠️ 与下一层（${nextLayer.lithology} ${nextLayer.startDepth}~${nextLayer.endDepth}m）重叠 ${(end - nextStart).toFixed(2)}m`);
-          } else {
-            hints.push(`💡 与下一层（${nextLayer.lithology} ${nextLayer.startDepth}~${nextLayer.endDepth}m）存在 ${(nextStart - end).toFixed(2)}m 间隙`);
-          }
-        } else {
-          hints.push(`✅ 与下一层（${nextLayer.lithology}）完美接续`);
-        }
-      }
-    }
-    setAdjacentLayerHint(hints.join("；"));
-  }, [editingLayerId, layerForm, getAdjacentLayers]);
-
-  const handleLayerInputChange = (field: keyof Omit<StratumLayer, "id">, value: string) => {
-    const nextForm = { ...layerForm, [field]: value };
-    setLayerForm(nextForm);
-    if (layerErrors[field]) setLayerErrors(prev => ({ ...prev, [field]: undefined }));
-    if (layerValidationMessage) setLayerValidationMessage("");
-    if (field === "startDepth" || field === "endDepth") {
-      if (field === "startDepth") setAutoFilledStartDepth(false);
-      checkAdjacentLayerImpact(nextForm);
-    }
-  };
-
-  const prepareNewLayerForm = useCallback((boreholeId?: string) => {
-    const targetId = boreholeId || selectedBorehole;
-    const layers = targetId ? (boreholeLayers[targetId] || []) : [];
-    const sorted = [...layers].sort((a, b) => parseFloat(a.startDepth) - parseFloat(b.startDepth));
-    if (sorted.length > 0) {
-      const lastLayer = sorted[sorted.length - 1];
-      setLayerForm({
-        ...emptyLayerForm,
-        startDepth: lastLayer.endDepth,
-      });
-      setAutoFilledStartDepth(true);
-    } else {
-      setLayerForm({ ...emptyLayerForm, startDepth: "0" });
-      setAutoFilledStartDepth(true);
-    }
-    setLayerErrors({});
-    setLayerValidationMessage("");
-    setAdjacentLayerHint("");
-  }, [selectedBorehole, boreholeLayers]);
-
-  const handleAddLayer = () => {
-    setLayerValidationMessage("");
-    const { valid, errors: formErrors } = validateLayerForm();
-    setLayerErrors(formErrors);
-    if (!valid) return;
-    const { hasOverlap } = checkOverlapAndGaps();
-    if (hasOverlap) { setLayerValidationMessage("该层与现有分层深度重叠，请调整深度范围"); return; }
-    if (!selectedBorehole) return;
-    const newLayer: StratumLayer = { ...layerForm, id: generateId() };
-    setBoreholeLayers(prev => {
-      const updated = { ...prev, [selectedBorehole]: [...(prev[selectedBorehole] || []), newLayer] };
-      setTimeout(() => {
-        prepareNewLayerForm(selectedBorehole);
-      }, 0);
-      return updated;
-    });
-  };
-
-  const handleUpdateLayer = () => {
-    setLayerValidationMessage("");
-    const { valid, errors: formErrors } = validateLayerForm();
-    setLayerErrors(formErrors);
-    if (!valid || !editingLayerId || !selectedBorehole) return;
-    const { hasOverlap } = checkOverlapAndGaps();
-    if (hasOverlap) { setLayerValidationMessage("该层与现有分层深度重叠，请调整深度范围"); return; }
-    setBoreholeLayers(prev => ({
-      ...prev,
-      [selectedBorehole]: prev[selectedBorehole].map(l => {
-        if (l.id !== editingLayerId) return l;
-        if (isCheckMode) {
-          return {
-            ...l,
-            description: layerForm.description,
-            isChecked: true,
-            checkedBy: currentRole,
-            checkedAt: new Date().toISOString(),
-            checkRemark: layerForm.description,
-          };
-        }
-        return { ...l, ...layerForm, id: editingLayerId };
-      })
-    }));
-    setLayerForm(emptyLayerForm); setEditingLayerId(null); setLayerErrors({}); setLayerValidationMessage(""); setAdjacentLayerHint(""); setAutoFilledStartDepth(false);
-  };
-
-  const handleEditLayer = (layer: StratumLayer) => {
-    setLayerForm({
-      startDepth: layer.startDepth,
-      endDepth: layer.endDepth,
-      lithology: layer.lithology,
-      soilColor: layer.soilColor,
-      density: layer.density,
-      description: layer.description,
-      isChecked: layer.isChecked,
-      checkedBy: layer.checkedBy,
-      checkedAt: layer.checkedAt,
-      checkRemark: layer.checkRemark,
-    });
-    setEditingLayerId(layer.id); setLayerErrors({}); setLayerValidationMessage(""); setAdjacentLayerHint(""); setAutoFilledStartDepth(false);
-  };
-
-  const handleDeleteLayer = (layerId: string) => {
-    if (!selectedBorehole) return;
-    setBoreholeLayers(prev => {
-      const updated = {
-        ...prev,
-        [selectedBorehole]: prev[selectedBorehole].filter(l => l.id !== layerId),
-      };
-      if (editingLayerId === layerId) {
-        setTimeout(() => {
-          prepareNewLayerForm(selectedBorehole);
-        }, 0);
-      }
-      return updated;
-    });
-    if (editingLayerId === layerId) {
-      setEditingLayerId(null);
-      setAdjacentLayerHint("");
-      setAutoFilledStartDepth(false);
-    } else if (!editingLayerId) {
-      setTimeout(() => {
-        prepareNewLayerForm(selectedBorehole);
-      }, 0);
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingLayerId(null);
-    setLayerErrors({});
-    setLayerValidationMessage("");
-    setAdjacentLayerHint("");
-    setTimeout(() => {
-      prepareNewLayerForm();
-    }, 0);
-  };
-
-  const validateSPTForm = useCallback((): { valid: boolean; errors: Partial<Record<keyof SPTRecord, string>> } => {
-    const errs: Partial<Record<keyof SPTRecord, string>> = {};
-    if (!sptForm.depth.trim()) { errs.depth = "深度不能为空"; }
-    else if (isNaN(parseFloat(sptForm.depth)) || parseFloat(sptForm.depth) < 0) { errs.depth = "深度必须为非负数"; }
-    if (!sptForm.blowCount.trim()) { errs.blowCount = "击数不能为空"; }
-    else if (isNaN(parseFloat(sptForm.blowCount)) || parseFloat(sptForm.blowCount) < 0) { errs.blowCount = "击数必须为非负数"; }
-    return { valid: Object.keys(errs).length === 0, errors: errs };
-  }, [sptForm]);
-
-  const handleSPTInputChange = (field: keyof Omit<SPTRecord, "id" | "layerId">, value: string | boolean) => {
-    setSPTForm(prev => ({ ...prev, [field]: value }));
-    if (sptErrors[field]) setSPTErrors(prev => ({ ...prev, [field]: undefined }));
-    if (sptValidationMessage) setSPTValidationMessage("");
-  };
-
-  const handleAddSPTRecord = () => {
-    setSPTValidationMessage("");
-    const { valid, errors: formErrors } = validateSPTForm();
-    setSPTErrors(formErrors);
-    if (!valid) return;
-    const depth = parseFloat(sptForm.depth);
-    const { valid: depthValid, message, layer } = checkDepthInLayers(depth);
-    if (!depthValid) { setSPTValidationMessage(message); return; }
-    if (!selectedBorehole || !layer) return;
-    setSPTRecords(prev => ({ ...prev, [selectedBorehole]: [...(prev[selectedBorehole] || []), { ...sptForm, id: generateId(), layerId: layer.id }] }));
-    setSPTForm(emptySPTForm); setSPTErrors({}); setSPTValidationMessage("");
-  };
-
-  const handleUpdateSPTRecord = () => {
-    setSPTValidationMessage("");
-    const { valid, errors: formErrors } = validateSPTForm();
-    setSPTErrors(formErrors);
-    if (!valid || !editingSPTId || !selectedBorehole) return;
-    const depth = parseFloat(sptForm.depth);
-    const { valid: depthValid, message, layer } = checkDepthInLayers(depth);
-    if (!depthValid) { setSPTValidationMessage(message); return; }
-    if (!layer) return;
-    setSPTRecords(prev => ({
-      ...prev,
-      [selectedBorehole]: prev[selectedBorehole].map(r => {
-        if (r.id !== editingSPTId) return r;
-        if (isCheckMode) {
-          return {
-            ...r,
-            isAbnormal: sptForm.isAbnormal,
-            remark: sptForm.remark,
-            isChecked: true,
-            checkedBy: currentRole,
-            checkedAt: new Date().toISOString(),
-            checkRemark: sptForm.remark,
-          };
-        }
-        return { ...r, ...sptForm, id: editingSPTId, layerId: layer.id };
-      })
-    }));
-    setSPTForm(emptySPTForm); setEditingSPTId(null); setSPTErrors({}); setSPTValidationMessage("");
-  };
-
-  const handleEditSPTRecord = (record: SPTRecord) => {
-    setSPTForm({
-      depth: record.depth,
-      blowCount: record.blowCount,
-      isAbnormal: record.isAbnormal,
-      remark: record.remark,
-      isChecked: record.isChecked,
-      checkedBy: record.checkedBy,
-      checkedAt: record.checkedAt,
-      checkRemark: record.checkRemark,
-    });
-    setEditingSPTId(record.id); setSPTErrors({}); setSPTValidationMessage("");
-  };
-
-  const handleDeleteSPTRecord = (recordId: string) => {
-    if (!selectedBorehole) return;
-    setSPTRecords(prev => ({ ...prev, [selectedBorehole]: prev[selectedBorehole].filter(r => r.id !== recordId) }));
-    if (editingSPTId === recordId) { setSPTForm(emptySPTForm); setEditingSPTId(null); }
-  };
-
-  const handleCancelSPTEdit = () => { setSPTForm(emptySPTForm); setEditingSPTId(null); setSPTErrors({}); setSPTValidationMessage(""); };
-
-  const validateSamplingForm = useCallback((): { valid: boolean; errors: Partial<Record<keyof SamplingRecord, string>> } => {
-    const errs: Partial<Record<keyof SamplingRecord, string>> = {};
-    if (!samplingForm.depth.trim()) { errs.depth = "深度不能为空"; }
-    else if (isNaN(parseFloat(samplingForm.depth)) || parseFloat(samplingForm.depth) < 0) { errs.depth = "深度必须为非负数"; }
-    if (!samplingForm.sampleType.trim()) { errs.sampleType = "取样类型不能为空"; }
-    if (!samplingForm.sampleNumber.trim()) { errs.sampleNumber = "样号不能为空"; }
-    return { valid: Object.keys(errs).length === 0, errors: errs };
-  }, [samplingForm]);
-
-  const handleSamplingInputChange = (field: keyof Omit<SamplingRecord, "id" | "layerId">, value: string) => {
-    setSamplingForm(prev => ({ ...prev, [field]: value }));
-    if (samplingErrors[field]) setSamplingErrors(prev => ({ ...prev, [field]: undefined }));
-    if (samplingValidationMessage) setSamplingValidationMessage("");
-  };
-
-  const handleAddSamplingRecord = () => {
-    setSamplingValidationMessage("");
-    const { valid, errors: formErrors } = validateSamplingForm();
-    setSamplingErrors(formErrors);
-    if (!valid) return;
-    const depth = parseFloat(samplingForm.depth);
-    const { valid: depthValid, message, layer } = checkDepthInLayers(depth);
-    if (!depthValid) { setSamplingValidationMessage(message); return; }
-    if (!selectedBorehole || !layer) return;
-    setSamplingRecords(prev => ({ ...prev, [selectedBorehole]: [...(prev[selectedBorehole] || []), { ...samplingForm, id: generateId(), layerId: layer.id }] }));
-    setSamplingForm(emptySamplingForm); setSamplingErrors({}); setSamplingValidationMessage("");
-  };
-
-  const handleUpdateSamplingRecord = () => {
-    setSamplingValidationMessage("");
-    const { valid, errors: formErrors } = validateSamplingForm();
-    setSamplingErrors(formErrors);
-    if (!valid || !editingSamplingId || !selectedBorehole) return;
-    const depth = parseFloat(samplingForm.depth);
-    const { valid: depthValid, message, layer } = checkDepthInLayers(depth);
-    if (!depthValid) { setSamplingValidationMessage(message); return; }
-    if (!layer) return;
-    setSamplingRecords(prev => ({ ...prev, [selectedBorehole]: prev[selectedBorehole].map(r => r.id === editingSamplingId ? { ...samplingForm, id: editingSamplingId, layerId: layer.id } : r) }));
-    setSamplingForm(emptySamplingForm); setEditingSamplingId(null); setSamplingErrors({}); setSamplingValidationMessage("");
-  };
-
-  const handleEditSamplingRecord = (record: SamplingRecord) => {
-    setSamplingForm({ depth: record.depth, sampleType: record.sampleType, sampleNumber: record.sampleNumber, remark: record.remark });
-    setEditingSamplingId(record.id); setSamplingErrors({}); setSamplingValidationMessage("");
-  };
-
-  const handleDeleteSamplingRecord = (recordId: string) => {
-    if (!selectedBorehole) return;
-    setSamplingRecords(prev => ({ ...prev, [selectedBorehole]: prev[selectedBorehole].filter(r => r.id !== recordId) }));
-    if (editingSamplingId === recordId) { setSamplingForm(emptySamplingForm); setEditingSamplingId(null); }
-  };
-
-  const handleCancelSamplingEdit = () => { setSamplingForm(emptySamplingForm); setEditingSamplingId(null); setSamplingErrors({}); setSamplingValidationMessage(""); };
-
-  const validateWaterLevelForm = useCallback((): { valid: boolean; errors: Partial<Record<keyof WaterLevelRecord, string>> } => {
-    const errs: Partial<Record<keyof WaterLevelRecord, string>> = {};
-    if (!waterLevelForm.firstSeenLevel.trim()) { errs.firstSeenLevel = "初见水位不能为空"; }
-    else if (isNaN(parseFloat(waterLevelForm.firstSeenLevel)) || parseFloat(waterLevelForm.firstSeenLevel) < 0) { errs.firstSeenLevel = "初见水位必须为非负数"; }
-    if (waterLevelForm.stableLevel.trim()) {
-      if (isNaN(parseFloat(waterLevelForm.stableLevel)) || parseFloat(waterLevelForm.stableLevel) < 0) { errs.stableLevel = "稳定水位必须为非负数"; }
-    }
-    if (!waterLevelForm.observationTime.trim()) { errs.observationTime = "观测时间不能为空"; }
-    return { valid: Object.keys(errs).length === 0, errors: errs };
-  }, [waterLevelForm]);
-
-  const handleWaterLevelInputChange = (field: keyof Omit<WaterLevelRecord, "id">, value: string) => {
-    setWaterLevelForm(prev => ({ ...prev, [field]: value }));
-    if (waterLevelErrors[field]) setWaterLevelErrors(prev => ({ ...prev, [field]: undefined }));
-    if (waterLevelValidationMessage) setWaterLevelValidationMessage("");
-  };
-
-  const handleAddWaterLevelRecord = () => {
-    setWaterLevelValidationMessage("");
-    const { valid, errors: formErrors } = validateWaterLevelForm();
-    setWaterLevelErrors(formErrors);
-    if (!valid) return;
-    if (!selectedBorehole) return;
-    const newRecord: WaterLevelRecord = { ...waterLevelForm, id: generateId() };
-    setWaterLevelRecords(prev => ({ ...prev, [selectedBorehole]: [...(prev[selectedBorehole] || []), newRecord] }));
-    setWaterLevelForm(emptyWaterLevelForm); setWaterLevelErrors({}); setWaterLevelValidationMessage("");
-  };
-
-  const handleUpdateWaterLevelRecord = () => {
-    setWaterLevelValidationMessage("");
-    const { valid, errors: formErrors } = validateWaterLevelForm();
-    setWaterLevelErrors(formErrors);
-    if (!valid || !editingWaterLevelId || !selectedBorehole) return;
-    setWaterLevelRecords(prev => ({ ...prev, [selectedBorehole]: prev[selectedBorehole].map(r => r.id === editingWaterLevelId ? { ...waterLevelForm, id: editingWaterLevelId } : r) }));
-    setWaterLevelForm(emptyWaterLevelForm); setEditingWaterLevelId(null); setWaterLevelErrors({}); setWaterLevelValidationMessage("");
-  };
-
-  const handleEditWaterLevelRecord = (record: WaterLevelRecord) => {
-    setWaterLevelForm({ firstSeenLevel: record.firstSeenLevel, stableLevel: record.stableLevel, observationTime: record.observationTime, weatherRemark: record.weatherRemark });
-    setEditingWaterLevelId(record.id); setWaterLevelErrors({}); setWaterLevelValidationMessage("");
-  };
-
-  const handleDeleteWaterLevelRecord = (recordId: string) => {
-    if (!selectedBorehole) return;
-    setWaterLevelRecords(prev => ({ ...prev, [selectedBorehole]: prev[selectedBorehole].filter(r => r.id !== recordId) }));
-    if (editingWaterLevelId === recordId) { setWaterLevelForm(emptyWaterLevelForm); setEditingWaterLevelId(null); }
-  };
-
-  const handleCancelWaterLevelEdit = () => { setWaterLevelForm(emptyWaterLevelForm); setEditingWaterLevelId(null); setWaterLevelErrors({}); setWaterLevelValidationMessage(""); };
+  const {
+    waterLevelForm,
+    setWaterLevelForm,
+    editingWaterLevelId,
+    setEditingWaterLevelId,
+    waterLevelErrors,
+    setWaterLevelErrors,
+    waterLevelValidationMessage,
+    setWaterLevelValidationMessage,
+    sortedWaterLevelRecords,
+    latestWaterLevel,
+    latestStableWaterLevel,
+    getLatestStableWaterLevel,
+    getWaterLevelDisplayText,
+    getLatestWaterLevelObservationText,
+    validateWaterLevelForm,
+    handleWaterLevelInputChange,
+    handleAddWaterLevelRecord,
+    handleUpdateWaterLevelRecord,
+    handleEditWaterLevelRecord,
+    handleDeleteWaterLevelRecord,
+    handleCancelWaterLevelEdit,
+    resetFormsOnBoreholeChange: resetWaterLevelFormsOnBoreholeChange,
+  } = useWaterLevelDisplay(waterLevelRecords, setWaterLevelRecords, selectedBorehole);
 
   const handleSelectBorehole = (boreholeId: string) => {
     setSelectedBorehole(boreholeId);
@@ -1010,9 +456,8 @@ function App() {
       prepareNewLayerForm(boreholeId);
     }, 0);
     setEditingLayerId(null); setLayerErrors({}); setLayerValidationMessage("");
-    setSPTForm(emptySPTForm); setEditingSPTId(null); setSPTErrors({}); setSPTValidationMessage("");
-    setSamplingForm(emptySamplingForm); setEditingSamplingId(null); setSamplingErrors({}); setSamplingValidationMessage("");
-    setWaterLevelForm(emptyWaterLevelForm); setEditingWaterLevelId(null); setWaterLevelErrors({}); setWaterLevelValidationMessage("");
+    resetSampleFormsOnBoreholeChange();
+    resetWaterLevelFormsOnBoreholeChange();
   };
 
   const handleToggleBoreholeForCompare = (boreholeId: string) => {
@@ -1079,41 +524,6 @@ function App() {
     }
   }, [records, boreholeLayers, sptRecords, samplingRecords, waterLevelRecords]);
 
-  const handleUpdateLayerCheck = useCallback((boreholeId: string, layerId: string, checkRemark: string) => {
-    setBoreholeLayers(prev => ({
-      ...prev,
-      [boreholeId]: (prev[boreholeId] || []).map(l => {
-        if (l.id !== layerId) return l;
-        return {
-          ...l,
-          isChecked: true,
-          checkedBy: currentRole,
-          checkedAt: new Date().toISOString(),
-          checkRemark: checkRemark,
-          description: l.description || checkRemark,
-        };
-      })
-    }));
-  }, [currentRole]);
-
-  const handleUpdateSPTCheck = useCallback((boreholeId: string, sptId: string, isAbnormal: boolean, checkRemark: string) => {
-    setSPTRecords(prev => ({
-      ...prev,
-      [boreholeId]: (prev[boreholeId] || []).map(r => {
-        if (r.id !== sptId) return r;
-        return {
-          ...r,
-          isAbnormal: isAbnormal,
-          isChecked: true,
-          checkedBy: currentRole,
-          checkedAt: new Date().toISOString(),
-          checkRemark: checkRemark,
-          remark: r.remark || checkRemark,
-        };
-      })
-    }));
-  }, [currentRole]);
-
   const compareBoreholeData = useMemo(() => {
     return selectedBoreholesForCompare
       .map(id => {
@@ -1172,33 +582,6 @@ function App() {
     return () => clearTimeout(timer);
   }, [sortedLayers, selectedBorehole, isLoading, editingLayerId, checkAdjacentLayerImpact]);
 
-  const hasActiveFilters = useMemo(() => {
-    return filters.lithology !== null || filters.hasGap !== null || filters.hasAbnormalSPT !== null || filters.missingStableWaterLevel !== null;
-  }, [filters]);
-
-  const filteredRecords = useMemo(() => {
-    if (!hasActiveFilters) return records;
-    return records.filter(r => {
-      const boreholeId = r["钻孔编号"];
-      if (filters.lithology !== null && r["岩性分类"] !== filters.lithology) {
-        return false;
-      }
-      if (filters.hasGap !== null) {
-        const hasGap = hasLayerGap(boreholeId);
-        if (filters.hasGap !== hasGap) return false;
-      }
-      if (filters.hasAbnormalSPT !== null) {
-        const hasAbnormal = hasAbnormalSPT(boreholeId);
-        if (filters.hasAbnormalSPT !== hasAbnormal) return false;
-      }
-      if (filters.missingStableWaterLevel !== null) {
-        const missing = isMissingStableWaterLevel(boreholeId);
-        if (filters.missingStableWaterLevel !== missing) return false;
-      }
-      return true;
-    });
-  }, [records, filters, hasActiveFilters, hasLayerGap, hasAbnormalSPT, isMissingStableWaterLevel]);
-
   const metrics = useMemo(() => {
     const totalDepth = filteredRecords.reduce((sum, r) => sum + (parseFloat(r["孔深"]) || 0), 0);
     let totalSPT = 0;
@@ -1254,14 +637,6 @@ function App() {
     });
     return { projectId: project.id, recordCount, totalDepth: totalDepth.toFixed(1) + "m", maxSPT: String(maxSPT) + "击", minWaterLevel: hasWaterLevelData ? minWaterLevel.toFixed(1) + "m" : "-", totalSPTCount, totalSamplingCount };
   }, [filteredRecords, sptRecords, samplingRecords, getLatestStableWaterLevel]);
-
-  const getBoreholeMaxSPT = useCallback((boreholeId: string): string => {
-    const bhSPT = sptRecords[boreholeId] || [];
-    if (bhSPT.length === 0) return "-";
-    let max = 0;
-    bhSPT.forEach(s => { const b = parseFloat(s.blowCount); if (!isNaN(b) && b > max) max = b; });
-    return String(max);
-  }, [sptRecords]);
 
   const generateTextSummary = useCallback(() => {
     const { projectId, recordCount, totalDepth, maxSPT, minWaterLevel, totalSPTCount, totalSamplingCount } = summaryStats;
