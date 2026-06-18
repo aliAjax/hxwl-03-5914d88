@@ -2233,7 +2233,7 @@ function App() {
                   : selectedBorehole
                   ? `${selectedBorehole} · ${activeEditorTab === "editor" ? "分层编辑器" : "柱状图"}`
                   : "请选择钻孔"}
-                {!chartViewMode && selectedRecord && <span className="hole-depth-tag">孔深 {selectedRecord["孔深"]}m</span>}
+                {chartViewMode === "single" && selectedRecord && <span className="hole-depth-tag">孔深 {selectedRecord["孔深"]}m</span>}
               </h2>
             </div>
           </div>
