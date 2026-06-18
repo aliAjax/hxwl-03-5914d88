@@ -333,3 +333,45 @@ export interface ReviewWorkbenchStats {
   depthAnomalies: number;
   total: number;
 }
+
+export type QualityIssueSeverity = "error" | "warning";
+
+export type QualityIssueCategory =
+  | "holeDepth"
+  | "layerContinuity"
+  | "sptDepth"
+  | "samplingDepth"
+  | "waterLevel"
+  | "duplicateSampleNumber"
+  | "missingRequiredField"
+  | "layerOverlap";
+
+export interface QualityIssue {
+  id: string;
+  boreholeId: string;
+  category: QualityIssueCategory;
+  severity: QualityIssueSeverity;
+  message: string;
+  detail?: string;
+  focusType?: "basicInfo" | "layer" | "spt" | "sampling" | "waterLevel";
+  focusId?: string;
+}
+
+export const QUALITY_CATEGORY_LABELS: Record<QualityIssueCategory, string> = {
+  holeDepth: "孔深异常",
+  layerContinuity: "分层连续性",
+  sptDepth: "标贯深度归属",
+  samplingDepth: "取样深度归属",
+  waterLevel: "水位异常",
+  duplicateSampleNumber: "重复样号",
+  missingRequiredField: "缺少关键字段",
+  layerOverlap: "分层重叠",
+};
+
+export interface QualityCheckStats {
+  totalErrors: number;
+  totalWarnings: number;
+  totalIssues: number;
+  byCategory: Record<QualityIssueCategory, number>;
+  byBorehole: Record<string, { errors: number; warnings: number }>;
+}

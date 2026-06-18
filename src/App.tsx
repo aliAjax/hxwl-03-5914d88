@@ -37,6 +37,7 @@ import BoreholeChart from "./components/BoreholeChart";
 import MultiBoreholeChart from "./components/MultiBoreholeChart";
 import ReviewWorkbench from "./components/ReviewWorkbench";
 import PrintReport from "./components/PrintReport";
+import QualityCheckPanel from "./components/QualityCheckPanel";
 
 const lithologyOptions = ["黏土", "粉质黏土", "粉土", "粉砂", "细砂", "中砂", "粗砂", "卵石", "圆砾", "强风化岩", "中风化岩", "微风化岩"];
 const soilColorOptions = ["褐黄色", "黄褐色", "灰黄色", "灰白色", "灰色", "灰褐色", "紫红色", "杂色"];
@@ -315,7 +316,7 @@ function App() {
   const [editingWaterLevelId, setEditingWaterLevelId] = useState<string | null>(null);
   const [waterLevelErrors, setWaterLevelErrors] = useState<Partial<Record<keyof WaterLevelRecord, string>>>({});
   const [waterLevelValidationMessage, setWaterLevelValidationMessage] = useState<string>("");
-  const [activeMainView, setActiveMainView] = useState<"borehole" | "review">("borehole");
+  const [activeMainView, setActiveMainView] = useState<"borehole" | "review" | "quality">("borehole");
   const [activeEditorTab, setActiveEditorTab] = useState<"editor" | "chart">("editor");
   const [chartViewMode, setChartViewMode] = useState<"single" | "compare">("single");
   const [selectedBoreholesForCompare, setSelectedBoreholesForCompare] = useState<string[]>([]);
@@ -1033,7 +1034,7 @@ function App() {
     setSelectedBoreholesForCompare([]);
   };
 
-  const handleNavigateToBorehole = useCallback((boreholeId: string, focusType?: "layer" | "spt", focusId?: string) => {
+  const handleNavigateToBorehole = useCallback((boreholeId: string, focusType?: "basicInfo" | "layer" | "spt" | "sampling" | "waterLevel", focusId?: string) => {
     setActiveMainView("borehole");
     setChartViewMode("single");
     setActiveEditorTab("editor");
@@ -1054,8 +1055,24 @@ function App() {
         handleEditSPTRecord(spt);
       }
     }, 50);
+    } else if (focusType === "sampling" && focusId) {
+      setTimeout(() => {
+      const samplings = samplingRecords[boreholeId] || [];
+      const sampling = samplings.find(s => s.id === focusId);
+      if (sampling) {
+        handleEditSamplingRecord(sampling);
+      }
+    }, 50);
+    } else if (focusType === "waterLevel" && focusId) {
+      setTimeout(() => {
+      const wls = waterLevelRecords[boreholeId] || [];
+      const wl = wls.find(w => w.id === focusId);
+      if (wl) {
+        handleEditWaterLevelRecord(wl);
+      }
+    }, 50);
     }
-  }, [boreholeLayers, sptRecords]);
+  }, [boreholeLayers, sptRecords, samplingRecords, waterLevelRecords]);
 
   const handleUpdateLayerCheck = useCallback((boreholeId: string, layerId: string, checkRemark: string) => {
     setBoreholeLayers(prev => ({
@@ -2276,9 +2293,25 @@ function App() {
           >
             🔍 校核工作台
           </button>
+          <button
+            className={`main-view-tab ${activeMainView === "quality" ? "active" : ""}`}
+            onClick={() => setActiveMainView("quality")}
+            title="全项目数据质量检查"
+          >
+            ✅ 质量检查
+          </button>
         </div>
 
-        {activeMainView === "review" ? (
+        {activeMainView === "quality" ? (
+          <QualityCheckPanel
+            records={records}
+            boreholeLayers={boreholeLayers}
+            sptRecords={sptRecords}
+            samplingRecords={samplingRecords}
+            waterLevelRecords={waterLevelRecords}
+            onNavigateToBorehole={handleNavigateToBorehole}
+          />
+        ) : activeMainView === "review" ? (
           <ReviewWorkbench
             records={records}
             boreholeLayers={boreholeLayers}
