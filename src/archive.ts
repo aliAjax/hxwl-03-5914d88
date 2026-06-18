@@ -16,8 +16,14 @@ import type {
   DepthNormalizationChange,
   BoreholeCheckInfo,
   NormalizationStats,
+  ConflictCategory,
+  FieldDiff,
+  RecordDiff,
+  CategoryDiff,
+  BoreholeConflictDetails,
+  ConflictResolution,
 } from "./types";
-import { ARCHIVE_VERSION } from "./types";
+import { ARCHIVE_VERSION, CATEGORY_LABELS } from "./types";
 import { saveProjectData, loadProjectData, type ProjectData } from "./db";
 
 const IMPORT_PROGRESS_KEY = "hxwl-03-import-progress";
@@ -495,6 +501,308 @@ const mergeCheckStatus = (
   return result;
 };
 
+const BASIC_INFO_FIELDS: Array<{ key: keyof DrillingRecord; label: string }> = [
+  { key: "钻孔编号", label: "钻孔编号" },
+  { key: "孔深", label: "孔深" },
+  { key: "岩性分类", label: "岩性分类" },
+  { key: "岩性描述", label: "岩性描述" },
+  { key: "土色", label: "土色" },
+  { key: "地下水位", label: "地下水位" },
+];
+
+const LAYER_FIELDS: Array<{ key: keyof StratumLayer; label: string }> = [
+  { key: "startDepth", label: "层顶深度" },
+  { key: "endDepth", label: "层底深度" },
+  { key: "lithology", label: "岩性" },
+  { key: "soilColor", label: "土色" },
+  { key: "density", label: "状态/密度" },
+  { key: "description", label: "描述" },
+];
+
+const SPT_FIELDS: Array<{ key: keyof SPTRecord; label: string }> = [
+  { key: "depth", label: "试验深度" },
+  { key: "blowCount", label: "击数" },
+  { key: "isAbnormal", label: "是否异常" },
+  { key: "remark", label: "备注" },
+];
+
+const SAMPLING_FIELDS: Array<{ key: keyof SamplingRecord; label: string }> = [
+  { key: "depth", label: "取样深度" },
+  { key: "sampleType", label: "样品类型" },
+  { key: "sampleNumber", label: "样品编号" },
+  { key: "remark", label: "备注" },
+];
+
+const WATERLEVEL_FIELDS: Array<{ key: keyof WaterLevelRecord; label: string }> = [
+  { key: "firstSeenLevel", label: "初见水位" },
+  { key: "stableLevel", label: "稳定水位" },
+  { key: "observationTime", label: "观测时间" },
+  { key: "weatherRemark", label: "天气/备注" },
+];
+
+const createEmptyCategoryDiff = (category: ConflictCategory): CategoryDiff => ({
+  category,
+  hasConflict: false,
+  addedCount: 0,
+  removedCount: 0,
+  modifiedCount: 0,
+  fieldDiffs: [],
+  recordDiffs: [],
+});
+
+const createEmptyConflictDetails = (): BoreholeConflictDetails => ({
+  hasConflict: false,
+  categories: {
+    basicInfo: createEmptyCategoryDiff("basicInfo"),
+    layers: createEmptyCategoryDiff("layers"),
+    spt: createEmptyCategoryDiff("spt"),
+    sampling: createEmptyCategoryDiff("sampling"),
+    waterLevel: createEmptyCategoryDiff("waterLevel"),
+  },
+});
+
+const valueEqual = (a: any, b: any): boolean => {
+  if (a === b) return true;
+  const aStr = a === undefined || a === null ? "" : String(a);
+  const bStr = b === undefined || b === null ? "" : String(b);
+  return aStr === bStr;
+};
+
+const compareBasicInfo = (
+  localRecord: DrillingRecord,
+  archiveRecord: DrillingRecord
+): CategoryDiff => {
+  const diff: CategoryDiff = createEmptyCategoryDiff("basicInfo");
+  const fieldDiffs: FieldDiff[] = [];
+
+  for (const { key, label } of BASIC_INFO_FIELDS) {
+    if (key === "钻孔编号") continue;
+    const localVal = localRecord[key] || "";
+    const archiveVal = archiveRecord[key] || "";
+    if (!valueEqual(localVal, archiveVal)) {
+      fieldDiffs.push({
+        field: key,
+        fieldLabel: label,
+        localValue: localVal,
+        archiveValue: archiveVal,
+      });
+    }
+  }
+
+  if (fieldDiffs.length > 0) {
+    diff.hasConflict = true;
+    diff.modifiedCount = fieldDiffs.length;
+    diff.fieldDiffs = fieldDiffs;
+  }
+
+  return diff;
+};
+
+interface RecordCompareConfig {
+  matchKey: string;
+  matchLabel: string;
+  fields: Array<{ key: string; label: string }>;
+  excludeFields?: string[];
+}
+
+const compareRecordArrays = (
+  localItems: Record<string, any>[],
+  archiveItems: Record<string, any>[],
+  config: RecordCompareConfig,
+  category: ConflictCategory
+): CategoryDiff => {
+  const diff: CategoryDiff = createEmptyCategoryDiff(category);
+  const { matchKey, matchLabel, fields, excludeFields = [] } = config;
+
+  const localMap = new Map<string, Record<string, any>>();
+  for (const item of localItems) {
+    const key = String(item[matchKey] ?? item.id ?? "");
+    if (key) localMap.set(key, item);
+  }
+
+  const archiveMap = new Map<string, Record<string, any>>();
+  for (const item of archiveItems) {
+    const key = String(item[matchKey] ?? item.id ?? "");
+    if (key) archiveMap.set(key, item);
+  }
+
+  const recordDiffs: RecordDiff[] = [];
+  let addedCount = 0;
+  let removedCount = 0;
+  let modifiedCount = 0;
+
+  for (const [key, archiveRec] of archiveMap) {
+    const localRec = localMap.get(key);
+    if (!localRec) {
+      addedCount++;
+      const fieldDiffs: FieldDiff[] = fields
+        .filter((f) => !excludeFields.includes(f.key))
+        .map((f) => ({
+          field: f.key,
+          fieldLabel: f.label,
+          localValue: "",
+          archiveValue: String(archiveRec[f.key] ?? ""),
+        }));
+      recordDiffs.push({
+        diffType: "added",
+        matchKey,
+        matchValue: key,
+        fields: fieldDiffs,
+        archiveRecord: archiveRec,
+      });
+    } else {
+      const fieldDiffs: FieldDiff[] = [];
+      for (const { key: fKey, label } of fields) {
+        if (excludeFields.includes(fKey)) continue;
+        const localVal = localRec[fKey];
+        const archiveVal = archiveRec[fKey];
+        if (!valueEqual(localVal, archiveVal)) {
+          fieldDiffs.push({
+            field: fKey,
+            fieldLabel: label,
+            localValue: String(localVal ?? ""),
+            archiveValue: String(archiveVal ?? ""),
+          });
+        }
+      }
+      if (fieldDiffs.length > 0) {
+        modifiedCount++;
+        recordDiffs.push({
+          diffType: "modified",
+          matchKey,
+          matchValue: key,
+          fields: fieldDiffs,
+          localRecord: localRec,
+          archiveRecord: archiveRec,
+        });
+      }
+    }
+  }
+
+  for (const [key, localRec] of localMap) {
+    if (!archiveMap.has(key)) {
+      removedCount++;
+      const fieldDiffs: FieldDiff[] = fields
+        .filter((f) => !excludeFields.includes(f.key))
+        .map((f) => ({
+          field: f.key,
+          fieldLabel: f.label,
+          localValue: String(localRec[f.key] ?? ""),
+          archiveValue: "",
+        }));
+      recordDiffs.push({
+        diffType: "removed",
+        matchKey,
+        matchValue: key,
+        fields: fieldDiffs,
+        localRecord: localRec,
+      });
+    }
+  }
+
+  if (addedCount > 0 || removedCount > 0 || modifiedCount > 0) {
+    diff.hasConflict = true;
+    diff.addedCount = addedCount;
+    diff.removedCount = removedCount;
+    diff.modifiedCount = modifiedCount;
+    diff.recordDiffs = recordDiffs;
+  }
+
+  return diff;
+};
+
+const computeBoreholeConflictDetails = (
+  localRecord: DrillingRecord,
+  archiveRecord: DrillingRecord,
+  localLayers: StratumLayer[],
+  archiveLayers: StratumLayer[],
+  localSPT: SPTRecord[],
+  archiveSPT: SPTRecord[],
+  localSampling: SamplingRecord[],
+  archiveSampling: SamplingRecord[],
+  localWater: WaterLevelRecord[],
+  archiveWater: WaterLevelRecord[]
+): BoreholeConflictDetails => {
+  const details = createEmptyConflictDetails();
+
+  details.categories.basicInfo = compareBasicInfo(localRecord, archiveRecord);
+
+  details.categories.layers = compareRecordArrays(
+    localLayers as any,
+    archiveLayers as any,
+    {
+      matchKey: "startDepth",
+      matchLabel: "层顶深度",
+      fields: LAYER_FIELDS,
+      excludeFields: ["id", "isChecked", "checkedBy", "checkedAt", "checkRemark", "layerId"],
+    },
+    "layers"
+  );
+
+  details.categories.spt = compareRecordArrays(
+    localSPT as any,
+    archiveSPT as any,
+    {
+      matchKey: "depth",
+      matchLabel: "试验深度",
+      fields: SPT_FIELDS,
+      excludeFields: ["id", "isChecked", "checkedBy", "checkedAt", "checkRemark", "layerId"],
+    },
+    "spt"
+  );
+
+  details.categories.sampling = compareRecordArrays(
+    localSampling as any,
+    archiveSampling as any,
+    {
+      matchKey: "sampleNumber",
+      matchLabel: "样品编号",
+      fields: SAMPLING_FIELDS,
+      excludeFields: ["id", "isChecked", "checkedBy", "checkedAt", "checkRemark", "layerId"],
+    },
+    "sampling"
+  );
+
+  details.categories.waterLevel = compareRecordArrays(
+    localWater as any,
+    archiveWater as any,
+    {
+      matchKey: "observationTime",
+      matchLabel: "观测时间",
+      fields: WATERLEVEL_FIELDS,
+      excludeFields: ["id", "isChecked", "checkedBy", "checkedAt", "checkRemark"],
+    },
+    "waterLevel"
+  );
+
+  details.hasConflict = Object.values(details.categories).some((c) => c.hasConflict);
+
+  return details;
+};
+
+const applyCategoryResolution = <T>(
+  localItems: T[],
+  archiveItems: T[],
+  resolution: ConflictResolution,
+  matchKey: string
+): T[] => {
+  if (resolution === "archive") {
+    return archiveItems;
+  }
+  return localItems;
+};
+
+const applyBasicInfoResolution = (
+  localRecord: DrillingRecord,
+  archiveRecord: DrillingRecord,
+  resolution: ConflictResolution
+): DrillingRecord => {
+  if (resolution === "archive") {
+    return archiveRecord;
+  }
+  return localRecord;
+};
+
 export const normalizeArchiveData = (archive: ArchiveData): {
   data: ArchiveData;
   warnings: string[];
@@ -791,14 +1099,48 @@ export const previewImport = async (archive: ArchiveData): Promise<ImportPreview
 
       if (conflictFields.length > 0) {
         conflictCount++;
+        const conflictDetails = computeBoreholeConflictDetails(
+          existingRecord,
+          record,
+          existingLayers,
+          newLayers,
+          existingSPT,
+          newSPT,
+          existingSampling,
+          newSampling,
+          existingWater,
+          newWater
+        );
+
+        const defaultResolutions: Partial<Record<ConflictCategory, ConflictResolution>> = {};
+        (Object.keys(conflictDetails.categories) as ConflictCategory[]).forEach((cat) => {
+          if (conflictDetails.categories[cat].hasConflict) {
+            defaultResolutions[cat] = "archive";
+          }
+        });
+
+        const categorySummary: string[] = [];
+        (Object.keys(conflictDetails.categories) as ConflictCategory[]).forEach((cat) => {
+          const cd = conflictDetails.categories[cat];
+          if (cd.hasConflict) {
+            const parts: string[] = [];
+            if (cd.modifiedCount > 0) parts.push(`修改${cd.modifiedCount}`);
+            if (cd.addedCount > 0) parts.push(`新增${cd.addedCount}`);
+            if (cd.removedCount > 0) parts.push(`删除${cd.removedCount}`);
+            categorySummary.push(`${CATEGORY_LABELS[cat]}(${parts.join("/")})`);
+          }
+        });
+
         boreholeItems.push({
           boreholeId,
           status: "conflict",
           conflictFields,
-          details: `存在 ${conflictFields.length} 处差异：${conflictFields.join("、")} | ${detailParts.join(" | ")}`,
+          details: `存在 ${conflictFields.length} 处差异：${categorySummary.join(" | ")} | ${detailParts.join(" | ")}`,
           normalizationChanges: normChanges.length > 0 ? normChanges : undefined,
           checkInfo,
           isDuplicateInArchive: false,
+          conflictDetails,
+          resolutions: defaultResolutions,
         });
       } else {
         overwriteCount++;
@@ -931,29 +1273,56 @@ export const applyImport = async (
       const archiveSampling = normalizedData.samplingRecords[boreholeId] || [];
       const archiveWater = normalizedData.waterLevelRecords[boreholeId] || [];
 
+      const localRecord = currentRecords.find((r) => r["钻孔编号"] === boreholeId);
       const localLayers = currentBoreholeLayers[boreholeId] || [];
       const localSPT = currentSPTRecords[boreholeId] || [];
       const localSampling = currentSamplingRecords[boreholeId] || [];
       const localWater = currentWaterLevelRecords[boreholeId] || [];
 
+      const resolutions = item.resolutions || {};
+
+      const basicInfoResolution: ConflictResolution = resolutions.basicInfo || "archive";
+      const layersResolution: ConflictResolution = resolutions.layers || "archive";
+      const sptResolution: ConflictResolution = resolutions.spt || "archive";
+      const samplingResolution: ConflictResolution = resolutions.sampling || "archive";
+      const waterLevelResolution: ConflictResolution = resolutions.waterLevel || "archive";
+
+      let finalRecord = archiveRecord;
       let finalLayers = archiveLayers;
       let finalSPT = archiveSPT;
       let finalSampling = archiveSampling;
       let finalWater = archiveWater;
 
-      if (options.preserveChecked) {
-        finalLayers = mergeCheckStatus(localLayers, archiveLayers, "startDepth") as StratumLayer[];
-        finalSPT = mergeCheckStatus(localSPT, archiveSPT, "depth") as SPTRecord[];
-        finalSampling = mergeCheckStatus(localSampling, archiveSampling, "sampleNumber") as SamplingRecord[];
-        finalWater = mergeCheckStatus(localWater, archiveWater, "observationTime") as WaterLevelRecord[];
+      if (item.status === "conflict") {
+        if (localRecord && archiveRecord) {
+          finalRecord = applyBasicInfoResolution(localRecord, archiveRecord, basicInfoResolution);
+        }
+        finalLayers = applyCategoryResolution(localLayers, archiveLayers, layersResolution, "startDepth");
+        finalSPT = applyCategoryResolution(localSPT, archiveSPT, sptResolution, "depth");
+        finalSampling = applyCategoryResolution(localSampling, archiveSampling, samplingResolution, "sampleNumber");
+        finalWater = applyCategoryResolution(localWater, archiveWater, waterLevelResolution, "observationTime");
+
+        if (options.preserveChecked) {
+          finalLayers = mergeCheckStatus(localLayers, finalLayers, "startDepth") as StratumLayer[];
+          finalSPT = mergeCheckStatus(localSPT, finalSPT, "depth") as SPTRecord[];
+          finalSampling = mergeCheckStatus(localSampling, finalSampling, "sampleNumber") as SamplingRecord[];
+          finalWater = mergeCheckStatus(localWater, finalWater, "observationTime") as WaterLevelRecord[];
+        }
+      } else {
+        if (options.preserveChecked) {
+          finalLayers = mergeCheckStatus(localLayers, archiveLayers, "startDepth") as StratumLayer[];
+          finalSPT = mergeCheckStatus(localSPT, archiveSPT, "depth") as SPTRecord[];
+          finalSampling = mergeCheckStatus(localSampling, archiveSampling, "sampleNumber") as SamplingRecord[];
+          finalWater = mergeCheckStatus(localWater, archiveWater, "observationTime") as WaterLevelRecord[];
+        }
       }
 
-      if (archiveRecord) {
+      if (finalRecord) {
         const idx = newRecords.findIndex((r) => r["钻孔编号"] === boreholeId);
         if (idx >= 0) {
-          newRecords[idx] = archiveRecord;
+          newRecords[idx] = finalRecord;
         } else {
-          newRecords.push(archiveRecord);
+          newRecords.push(finalRecord);
         }
       }
 
@@ -971,7 +1340,15 @@ export const applyImport = async (
       }
 
       if (item.status === "conflict") {
-        warnings.push(`已处理冲突钻孔：${boreholeId}${options.preserveChecked ? "（保留本地已校核数据）" : ""}`);
+        const resolvedParts: string[] = [];
+        (Object.keys(item.conflictDetails?.categories || {}) as ConflictCategory[]).forEach((cat) => {
+          const catDiff = item.conflictDetails?.categories[cat];
+          if (catDiff?.hasConflict) {
+            const res = resolutions[cat] || "archive";
+            resolvedParts.push(`${CATEGORY_LABELS[cat]}${res === "archive" ? "用归档" : "留本地"}`);
+          }
+        });
+        warnings.push(`已处理冲突钻孔：${boreholeId}（${resolvedParts.join("，")}）${options.preserveChecked ? " · 保留本地已校核数据" : ""}`);
       }
       importedCount++;
       processedIds.add(itemKey);

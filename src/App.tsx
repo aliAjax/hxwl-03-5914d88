@@ -14,8 +14,15 @@ import type {
   ImportPreviewResult,
   ImportResult,
   ArchiveData,
+  BoreholeImportItem,
+  ConflictCategory,
+  ConflictResolution,
+  CategoryDiff,
+  RecordDiff,
+  FieldDiff,
+  BoreholeConflictDetails,
 } from "./types";
-import { rolePermissions, roleDescriptions } from "./types";
+import { rolePermissions, roleDescriptions, CATEGORY_LABELS } from "./types";
 import { saveProjectData, loadProjectData, clearProjectData, type ProjectData } from "./db";
 import {
   createArchive,
@@ -336,6 +343,7 @@ function App() {
   const [interruptedImportInfo, setInterruptedImportInfo] = useState<{ total: number; current: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [expandedConflictBoreholes, setExpandedConflictBoreholes] = useState<Set<string>>(new Set());
 
   const currentLayers = useMemo(() => {
     if (!selectedBorehole) return [];
@@ -1636,6 +1644,7 @@ function App() {
     setImportPreview(null);
     setImportLoading(true);
     setImportFile(file);
+    setExpandedConflictBoreholes(new Set());
 
     try {
       const archiveData = await parseArchiveFile(file);
@@ -1693,9 +1702,88 @@ function App() {
     setImportError("");
     setImportResult(null);
     setIsDragOver(false);
+    setExpandedConflictBoreholes(new Set());
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+  }, []);
+
+  const toggleConflictBoreholeExpanded = useCallback((boreholeId: string) => {
+    setExpandedConflictBoreholes((prev) => {
+      const next = new Set(prev);
+      if (next.has(boreholeId)) {
+        next.delete(boreholeId);
+      } else {
+        next.add(boreholeId);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleCategoryResolutionChange = useCallback((
+    boreholeIndex: number,
+    category: ConflictCategory,
+    resolution: ConflictResolution
+  ) => {
+    setImportPreview((prev) => {
+      if (!prev) return prev;
+      const newBoreholes = [...prev.boreholes];
+      const item = newBoreholes[boreholeIndex];
+      if (item) {
+        newBoreholes[boreholeIndex] = {
+          ...item,
+          resolutions: {
+            ...(item.resolutions || {}),
+            [category]: resolution,
+          },
+        };
+      }
+      return { ...prev, boreholes: newBoreholes };
+    });
+  }, []);
+
+  const handleBulkCategoryResolution = useCallback((
+    category: ConflictCategory,
+    resolution: ConflictResolution
+  ) => {
+    setImportPreview((prev) => {
+      if (!prev) return prev;
+      const newBoreholes = prev.boreholes.map((item) => {
+        if (item.status === "conflict" && item.conflictDetails?.categories[category]?.hasConflict) {
+          return {
+            ...item,
+            resolutions: {
+              ...(item.resolutions || {}),
+              [category]: resolution,
+            },
+          };
+        }
+        return item;
+      });
+      return { ...prev, boreholes: newBoreholes };
+    });
+  }, []);
+
+  const handleBulkAllConflictResolution = useCallback((resolution: ConflictResolution) => {
+    setImportPreview((prev) => {
+      if (!prev) return prev;
+      const newBoreholes = prev.boreholes.map((item) => {
+        if (item.status === "conflict" && item.conflictDetails) {
+          const newResolutions: Partial<Record<ConflictCategory, ConflictResolution>> = {};
+          (Object.keys(item.conflictDetails.categories) as ConflictCategory[]).forEach((cat) => {
+            if (item.conflictDetails!.categories[cat].hasConflict) {
+              newResolutions[cat] = resolution;
+            }
+          });
+          return {
+            ...item,
+            resolutions: newResolutions,
+          };
+        }
+        return item;
+      });
+      return { ...prev, boreholes: newBoreholes };
+    });
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -3278,7 +3366,7 @@ function App() {
                         checked={importOptions.includeConflict}
                         onChange={(e) => setImportOptions(prev => ({ ...prev, includeConflict: e.target.checked }))}
                       />
-                      <span>覆盖冲突数据（{importPreview.conflictCount}个，将丢失本地修改）</span>
+                      <span>处理冲突钻孔（{importPreview.conflictCount}个，可展开逐项选择保留本地或采用归档）</span>
                     </label>
                     <label className="option-checkbox">
                       <input
@@ -3290,28 +3378,186 @@ function App() {
                     </label>
                   </div>
 
-                  <div className="preview-list">
-                    <h4>钻孔明细</h4>
-                    <div className="borehole-preview-list">
-                      {importPreview.boreholes.map((item, i) => (
-                        <div key={i} className={`borehole-preview-item status-${item.status}${item.isDuplicateInArchive ? ' is-duplicate' : ''}`}>
-                          <div className="borehole-preview-id">
-                            <span className={`status-dot dot-${item.status}`}></span>
-                            <strong>{item.boreholeId}</strong>
-                            {item.checkInfo?.hasAnyChecked && <span className="check-badge" title="含校核数据">✓</span>}
-                            {item.isDuplicateInArchive && <span className="duplicate-badge">重复#{item.duplicateIndex !== undefined ? item.duplicateIndex + 1 : ''}</span>}
-                          </div>
-                          <span className="borehole-preview-detail">{item.details}</span>
-                          {item.normalizationChanges && item.normalizationChanges.length > 0 && (
-                            <div className="norm-changes">
-                              {item.normalizationChanges.slice(0, 3).map((c, ci) => (
-                                <span key={ci} className="norm-change-tag">{c.field}: {c.original} → {c.normalized}</span>
-                              ))}
-                              {item.normalizationChanges.length > 3 && <span className="norm-change-tag">+{item.normalizationChanges.length - 3}</span>}
-                            </div>
-                          )}
+                  {importOptions.includeConflict && importPreview.conflictCount > 0 && (
+                    <div className="conflict-bulk-actions">
+                      <h4>批量处理冲突</h4>
+                      <div className="bulk-action-row">
+                        <div className="bulk-action-group">
+                          <span>所有冲突类别：</span>
+                          <button className="bulk-btn" onClick={() => handleBulkAllConflictResolution("archive")}>全部采用归档</button>
+                          <button className="bulk-btn" onClick={() => handleBulkAllConflictResolution("local")}>全部保留本地</button>
                         </div>
-                      ))}
+                      </div>
+                      <div className="bulk-action-row">
+                        <div className="bulk-action-group">
+                          <span>按类别批量：</span>
+                          {(["basicInfo", "layers", "spt", "sampling", "waterLevel"] as ConflictCategory[]).map((cat) => {
+                            const hasConflictInCategory = importPreview.boreholes.some(
+                              (item) => item.status === "conflict" && item.conflictDetails?.categories[cat]?.hasConflict
+                            );
+                            if (!hasConflictInCategory) return null;
+                            return (
+                              <div key={cat} className="bulk-category-group">
+                                <span className="bulk-category-label">{CATEGORY_LABELS[cat]}</span>
+                                <button
+                                  className="bulk-btn-small"
+                                  onClick={() => handleBulkCategoryResolution(cat, "archive")}
+                                >归档</button>
+                                <button
+                                  className="bulk-btn-small"
+                                  onClick={() => handleBulkCategoryResolution(cat, "local")}
+                                >本地</button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="preview-list">
+                    <h4>钻孔明细（点击冲突钻孔可展开查看差异）</h4>
+                    <div className="borehole-preview-list">
+                      {importPreview.boreholes.map((item, i) => {
+                        const isExpanded = expandedConflictBoreholes.has(item.boreholeId);
+                        const hasConflictDetails = item.status === "conflict" && item.conflictDetails?.hasConflict;
+                        return (
+                          <div
+                            key={i}
+                            className={`borehole-preview-item status-${item.status}${item.isDuplicateInArchive ? ' is-duplicate' : ''}${hasConflictDetails ? ' is-expandable' : ''}${isExpanded ? ' is-expanded' : ''}`}
+                          >
+                            <div
+                              className="borehole-preview-header"
+                              onClick={() => hasConflictDetails && toggleConflictBoreholeExpanded(item.boreholeId)}
+                              style={{ cursor: hasConflictDetails ? 'pointer' : 'default' }}
+                            >
+                              <div className="borehole-preview-id">
+                                {hasConflictDetails && (
+                                  <span className={`expand-icon ${isExpanded ? 'expanded' : ''}`}>▶</span>
+                                )}
+                                <span className={`status-dot dot-${item.status}`}></span>
+                                <strong>{item.boreholeId}</strong>
+                                {item.checkInfo?.hasAnyChecked && <span className="check-badge" title="含校核数据">✓</span>}
+                                {item.isDuplicateInArchive && <span className="duplicate-badge">重复#{item.duplicateIndex !== undefined ? item.duplicateIndex + 1 : ''}</span>}
+                              </div>
+                              <span className="borehole-preview-detail">{item.details}</span>
+                              {item.normalizationChanges && item.normalizationChanges.length > 0 && (
+                                <div className="norm-changes">
+                                  {item.normalizationChanges.slice(0, 3).map((c, ci) => (
+                                    <span key={ci} className="norm-change-tag">{c.field}: {c.original} → {c.normalized}</span>
+                                  ))}
+                                  {item.normalizationChanges.length > 3 && <span className="norm-change-tag">+{item.normalizationChanges.length - 3}</span>}
+                                </div>
+                              )}
+                            </div>
+
+                            {isExpanded && hasConflictDetails && (
+                              <div className="conflict-details-panel">
+                                {(["basicInfo", "layers", "spt", "sampling", "waterLevel"] as ConflictCategory[]).map((cat) => {
+                                  const catDiff = item.conflictDetails!.categories[cat];
+                                  if (!catDiff.hasConflict) return null;
+                                  const resolution = item.resolutions?.[cat] || "archive";
+                                  return (
+                                    <div key={cat} className="category-conflict-block">
+                                      <div className="category-conflict-header">
+                                        <div className="category-title-row">
+                                          <span className="category-conflict-title">
+                                            <strong>{CATEGORY_LABELS[cat]}</strong>
+                                          </span>
+                                          <span className="category-conflict-stats">
+                                            {catDiff.modifiedCount > 0 && <span className="stat-tag stat-modified">修改{catDiff.modifiedCount}</span>}
+                                            {catDiff.addedCount > 0 && <span className="stat-tag stat-added">新增{catDiff.addedCount}</span>}
+                                            {catDiff.removedCount > 0 && <span className="stat-tag stat-removed">删除{catDiff.removedCount}</span>}
+                                          </span>
+                                        </div>
+                                        <div className="category-resolution-row">
+                                          <span className="resolution-label">处理方式：</span>
+                                          <label className={`resolution-option ${resolution === "archive" ? "selected" : ""}`}>
+                                            <input
+                                              type="radio"
+                                              name={`resolution-${item.boreholeId}-${cat}`}
+                                              checked={resolution === "archive"}
+                                              onChange={() => handleCategoryResolutionChange(i, cat, "archive")}
+                                            />
+                                            <span>采用归档</span>
+                                          </label>
+                                          <label className={`resolution-option ${resolution === "local" ? "selected" : ""}`}>
+                                            <input
+                                              type="radio"
+                                              name={`resolution-${item.boreholeId}-${cat}`}
+                                              checked={resolution === "local"}
+                                              onChange={() => handleCategoryResolutionChange(i, cat, "local")}
+                                            />
+                                            <span>保留本地</span>
+                                          </label>
+                                        </div>
+                                      </div>
+
+                                      <div className="diff-table-wrapper">
+                                        {cat === "basicInfo" ? (
+                                          <table className="diff-table">
+                                            <thead>
+                                              <tr>
+                                                <th>字段</th>
+                                                <th className="col-local">本地值</th>
+                                                <th className="col-arrow"></th>
+                                                <th className="col-archive">归档值</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {catDiff.fieldDiffs.map((fd, fi) => (
+                                                <tr key={fi} className="diff-row diff-modified">
+                                                  <td className="diff-field-name">{fd.fieldLabel}</td>
+                                                  <td className={`diff-value col-local ${resolution === "local" ? "value-selected" : ""}`}>{fd.localValue || "—"}</td>
+                                                  <td className="col-arrow">→</td>
+                                                  <td className={`diff-value col-archive ${resolution === "archive" ? "value-selected" : ""}`}>{fd.archiveValue || "—"}</td>
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        ) : (
+                                          <table className="diff-table">
+                                            <thead>
+                                              <tr>
+                                                <th>类型</th>
+                                                <th>匹配键</th>
+                                                <th>字段</th>
+                                                <th className="col-local">本地值</th>
+                                                <th className="col-arrow"></th>
+                                                <th className="col-archive">归档值</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {catDiff.recordDiffs.map((rd, ri) => (
+                                                rd.fields.map((fd, fi) => (
+                                                  <tr key={`${ri}-${fi}`} className={`diff-row diff-${rd.diffType}`}>
+                                                    {fi === 0 && (
+                                                      <>
+                                                        <td rowSpan={rd.fields.length} className={`diff-type-cell diff-type-${rd.diffType}`}>
+                                                          {rd.diffType === "added" ? "新增" : rd.diffType === "removed" ? "删除" : "修改"}
+                                                        </td>
+                                                        <td rowSpan={rd.fields.length} className="diff-match-key">{rd.matchValue}</td>
+                                                      </>
+                                                    )}
+                                                    <td className="diff-field-name">{fd.fieldLabel}</td>
+                                                    <td className={`diff-value col-local ${rd.diffType === "removed" ? "value-strikethrough" : ""} ${resolution === "local" ? "value-selected" : ""}`}>{fd.localValue || "—"}</td>
+                                                    <td className="col-arrow">→</td>
+                                                    <td className={`diff-value col-archive ${rd.diffType === "added" ? "value-highlight" : ""} ${resolution === "archive" ? "value-selected" : ""}`}>{fd.archiveValue || "—"}</td>
+                                                  </tr>
+                                                ))
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>

@@ -177,6 +177,50 @@ export interface ArchiveData {
 
 export type ImportStatus = "new" | "overwrite" | "conflict" | "unrecognized";
 
+export type ConflictCategory = "basicInfo" | "layers" | "spt" | "sampling" | "waterLevel";
+export type ConflictResolution = "local" | "archive";
+
+export const CATEGORY_LABELS: Record<ConflictCategory, string> = {
+  basicInfo: "钻孔基础信息",
+  layers: "分层数据",
+  spt: "标贯数据",
+  sampling: "取样数据",
+  waterLevel: "水位数据",
+};
+
+export interface FieldDiff {
+  field: string;
+  fieldLabel: string;
+  localValue: string;
+  archiveValue: string;
+}
+
+export type DiffType = "added" | "removed" | "modified";
+
+export interface RecordDiff {
+  diffType: DiffType;
+  matchKey: string;
+  matchValue: string;
+  fields: FieldDiff[];
+  localRecord?: Record<string, any>;
+  archiveRecord?: Record<string, any>;
+}
+
+export interface CategoryDiff {
+  category: ConflictCategory;
+  hasConflict: boolean;
+  addedCount: number;
+  removedCount: number;
+  modifiedCount: number;
+  fieldDiffs: FieldDiff[];
+  recordDiffs: RecordDiff[];
+}
+
+export interface BoreholeConflictDetails {
+  hasConflict: boolean;
+  categories: Record<ConflictCategory, CategoryDiff>;
+}
+
 export interface DepthNormalizationChange {
   field: string;
   original: string;
@@ -204,6 +248,8 @@ export interface BoreholeImportItem {
   checkInfo?: BoreholeCheckInfo;
   isDuplicateInArchive?: boolean;
   duplicateIndex?: number;
+  conflictDetails?: BoreholeConflictDetails;
+  resolutions?: Partial<Record<ConflictCategory, ConflictResolution>>;
 }
 
 export interface NormalizationStats {
