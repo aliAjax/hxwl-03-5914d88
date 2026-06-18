@@ -1039,7 +1039,12 @@ function App() {
     setChartViewMode("single");
     setActiveEditorTab("editor");
     handleSelectBorehole(boreholeId);
-    if (focusType === "layer" && focusId) {
+    if (focusType === "basicInfo") {
+      const record = records.find(r => r["钻孔编号"] === boreholeId);
+      if (record) {
+        handleEditRecord(record);
+      }
+    } else if (focusType === "layer" && focusId) {
       setTimeout(() => {
       const layers = boreholeLayers[boreholeId] || [];
       const layer = layers.find(l => l.id === focusId);
@@ -1072,7 +1077,7 @@ function App() {
       }
     }, 50);
     }
-  }, [boreholeLayers, sptRecords, samplingRecords, waterLevelRecords]);
+  }, [records, boreholeLayers, sptRecords, samplingRecords, waterLevelRecords]);
 
   const handleUpdateLayerCheck = useCallback((boreholeId: string, layerId: string, checkRemark: string) => {
     setBoreholeLayers(prev => ({

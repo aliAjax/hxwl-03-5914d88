@@ -123,6 +123,10 @@ export default function QualityCheckPanel({
         }
       }
 
+      const sortedLayers = [...layers].sort(
+        (a, b) => parseFloat(a.startDepth) - parseFloat(b.startDepth)
+      );
+
       if (layers.length === 0) {
         issues.push({
           id: generateIssueId(),
@@ -134,10 +138,6 @@ export default function QualityCheckPanel({
           focusType: "layer",
         });
       } else {
-        const sortedLayers = [...layers].sort(
-          (a, b) => parseFloat(a.startDepth) - parseFloat(b.startDepth)
-        );
-
         let prevEnd = 0;
         for (const layer of sortedLayers) {
           const ls = parseFloat(layer.startDepth);
@@ -258,174 +258,174 @@ export default function QualityCheckPanel({
             focusType: "layer",
           });
         }
+      }
 
-        for (const spt of bhSPT) {
-          const depth = parseFloat(spt.depth);
-          if (isNaN(depth) || !spt.depth.trim()) {
-            issues.push({
-              id: generateIssueId(),
-              boreholeId,
-              category: "missingRequiredField",
-              severity: "error",
-              message: `标贯记录深度无效：${spt.depth || "(空)"}`,
-              detail: "请填写有效的标贯深度值",
-              focusType: "spt",
-              focusId: spt.id,
-            });
-            continue;
-          }
-          const inLayer = sortedLayers.some(
-            (l) =>
-              !isNaN(parseFloat(l.startDepth)) &&
-              !isNaN(parseFloat(l.endDepth)) &&
-              depth >= parseFloat(l.startDepth) &&
-              depth <= parseFloat(l.endDepth)
-          );
-          if (!inLayer) {
-            issues.push({
-              id: generateIssueId(),
-              boreholeId,
-              category: "sptDepth",
-              severity: "error",
-              message: `标贯深度 ${spt.depth}m 不落在任何分层内`,
-              detail: "请检查标贯深度或补充对应分层",
-              focusType: "spt",
-              focusId: spt.id,
-            });
-          }
-          if (holeDepth > 0 && depth > holeDepth) {
-            issues.push({
-              id: generateIssueId(),
-              boreholeId,
-              category: "sptDepth",
-              severity: "error",
-              message: `标贯深度 ${spt.depth}m 超出孔深 ${holeDepth}m`,
-              focusType: "spt",
-              focusId: spt.id,
-            });
-          }
-          if (!spt.blowCount || !spt.blowCount.trim() || isNaN(parseFloat(spt.blowCount))) {
-            issues.push({
-              id: generateIssueId(),
-              boreholeId,
-              category: "missingRequiredField",
-              severity: "warning",
-              message: `标贯 ${spt.depth}m 缺少击数值`,
-              detail: "请补充该标贯试验的击数",
-              focusType: "spt",
-              focusId: spt.id,
-            });
-          }
+      for (const spt of bhSPT) {
+        const depth = parseFloat(spt.depth);
+        if (isNaN(depth) || !spt.depth.trim()) {
+          issues.push({
+            id: generateIssueId(),
+            boreholeId,
+            category: "missingRequiredField",
+            severity: "error",
+            message: `标贯记录深度无效：${spt.depth || "(空)"}`,
+            detail: "请填写有效的标贯深度值",
+            focusType: "spt",
+            focusId: spt.id,
+          });
+          continue;
         }
-
-        for (const sample of bhSampling) {
-          const depth = parseFloat(sample.depth);
-          if (isNaN(depth) || !sample.depth.trim()) {
-            issues.push({
-              id: generateIssueId(),
-              boreholeId,
-              category: "missingRequiredField",
-              severity: "error",
-              message: `取样记录深度无效：${sample.depth || "(空)"}`,
-              detail: "请填写有效的取样深度值",
-              focusType: "sampling",
-              focusId: sample.id,
-            });
-            continue;
-          }
-          const inLayer = sortedLayers.some(
-            (l) =>
-              !isNaN(parseFloat(l.startDepth)) &&
-              !isNaN(parseFloat(l.endDepth)) &&
-              depth >= parseFloat(l.startDepth) &&
-              depth <= parseFloat(l.endDepth)
-          );
-          if (!inLayer) {
-            issues.push({
-              id: generateIssueId(),
-              boreholeId,
-              category: "samplingDepth",
-              severity: "error",
-              message: `取样深度 ${sample.depth}m 不落在任何分层内`,
-              detail: "请检查取样深度或补充对应分层",
-              focusType: "sampling",
-              focusId: sample.id,
-            });
-          }
-          if (holeDepth > 0 && depth > holeDepth) {
-            issues.push({
-              id: generateIssueId(),
-              boreholeId,
-              category: "samplingDepth",
-              severity: "error",
-              message: `取样深度 ${sample.depth}m 超出孔深 ${holeDepth}m`,
-              focusType: "sampling",
-              focusId: sample.id,
-            });
-          }
-          if (!sample.sampleNumber || !sample.sampleNumber.trim()) {
-            issues.push({
-              id: generateIssueId(),
-              boreholeId,
-              category: "missingRequiredField",
-              severity: "warning",
-              message: `取样 ${sample.depth}m 缺少样号`,
-              detail: "请补充该样品的编号",
-              focusType: "sampling",
-              focusId: sample.id,
-            });
-          }
-          if (!sample.sampleType || !sample.sampleType.trim()) {
-            issues.push({
-              id: generateIssueId(),
-              boreholeId,
-              category: "missingRequiredField",
-              severity: "warning",
-              message: `取样 ${sample.depth}m 缺少样品类型`,
-              detail: "请补充该样品的类型（原状样/扰动样/岩芯样/水样）",
-              focusType: "sampling",
-              focusId: sample.id,
-            });
-          }
+        const inLayer = sortedLayers.some(
+          (l) =>
+            !isNaN(parseFloat(l.startDepth)) &&
+            !isNaN(parseFloat(l.endDepth)) &&
+            depth >= parseFloat(l.startDepth) &&
+            depth <= parseFloat(l.endDepth)
+        );
+        if (!inLayer) {
+          issues.push({
+            id: generateIssueId(),
+            boreholeId,
+            category: "sptDepth",
+            severity: "error",
+            message: `标贯深度 ${spt.depth}m 不落在任何分层内`,
+            detail: "请检查标贯深度或补充对应分层",
+            focusType: "spt",
+            focusId: spt.id,
+          });
         }
+        if (holeDepth > 0 && depth > holeDepth) {
+          issues.push({
+            id: generateIssueId(),
+            boreholeId,
+            category: "sptDepth",
+            severity: "error",
+            message: `标贯深度 ${spt.depth}m 超出孔深 ${holeDepth}m`,
+            focusType: "spt",
+            focusId: spt.id,
+          });
+        }
+        if (!spt.blowCount || !spt.blowCount.trim() || isNaN(parseFloat(spt.blowCount))) {
+          issues.push({
+            id: generateIssueId(),
+            boreholeId,
+            category: "missingRequiredField",
+            severity: "warning",
+            message: `标贯 ${spt.depth}m 缺少击数值`,
+            detail: "请补充该标贯试验的击数",
+            focusType: "spt",
+            focusId: spt.id,
+          });
+        }
+      }
 
-        for (const wl of bhWL) {
-          const firstSeen = parseFloat(wl.firstSeenLevel);
-          const stable = parseFloat(wl.stableLevel);
-          if (wl.firstSeenLevel && !isNaN(firstSeen) && holeDepth > 0 && firstSeen > holeDepth) {
-            issues.push({
-              id: generateIssueId(),
-              boreholeId,
-              category: "waterLevel",
-              severity: "error",
-              message: `初见水位 ${wl.firstSeenLevel}m 超出孔深 ${holeDepth}m`,
-              focusType: "waterLevel",
-              focusId: wl.id,
-            });
-          }
-          if (wl.stableLevel && !isNaN(stable) && holeDepth > 0 && stable > holeDepth) {
-            issues.push({
-              id: generateIssueId(),
-              boreholeId,
-              category: "waterLevel",
-              severity: "error",
-              message: `稳定水位 ${wl.stableLevel}m 超出孔深 ${holeDepth}m`,
-              focusType: "waterLevel",
-              focusId: wl.id,
-            });
-          }
-          if (!wl.observationTime || !wl.observationTime.trim()) {
-            issues.push({
-              id: generateIssueId(),
-              boreholeId,
-              category: "missingRequiredField",
-              severity: "warning",
-              message: "水位记录缺少观测时间",
-              detail: "请补充水位观测的时间",
-              focusType: "waterLevel",
-              focusId: wl.id,
-            });
-          }
+      for (const sample of bhSampling) {
+        const depth = parseFloat(sample.depth);
+        if (isNaN(depth) || !sample.depth.trim()) {
+          issues.push({
+            id: generateIssueId(),
+            boreholeId,
+            category: "missingRequiredField",
+            severity: "error",
+            message: `取样记录深度无效：${sample.depth || "(空)"}`,
+            detail: "请填写有效的取样深度值",
+            focusType: "sampling",
+            focusId: sample.id,
+          });
+          continue;
+        }
+        const inLayer = sortedLayers.some(
+          (l) =>
+            !isNaN(parseFloat(l.startDepth)) &&
+            !isNaN(parseFloat(l.endDepth)) &&
+            depth >= parseFloat(l.startDepth) &&
+            depth <= parseFloat(l.endDepth)
+        );
+        if (!inLayer) {
+          issues.push({
+            id: generateIssueId(),
+            boreholeId,
+            category: "samplingDepth",
+            severity: "error",
+            message: `取样深度 ${sample.depth}m 不落在任何分层内`,
+            detail: "请检查取样深度或补充对应分层",
+            focusType: "sampling",
+            focusId: sample.id,
+          });
+        }
+        if (holeDepth > 0 && depth > holeDepth) {
+          issues.push({
+            id: generateIssueId(),
+            boreholeId,
+            category: "samplingDepth",
+            severity: "error",
+            message: `取样深度 ${sample.depth}m 超出孔深 ${holeDepth}m`,
+            focusType: "sampling",
+            focusId: sample.id,
+          });
+        }
+        if (!sample.sampleNumber || !sample.sampleNumber.trim()) {
+          issues.push({
+            id: generateIssueId(),
+            boreholeId,
+            category: "missingRequiredField",
+            severity: "warning",
+            message: `取样 ${sample.depth}m 缺少样号`,
+            detail: "请补充该样品的编号",
+            focusType: "sampling",
+            focusId: sample.id,
+          });
+        }
+        if (!sample.sampleType || !sample.sampleType.trim()) {
+          issues.push({
+            id: generateIssueId(),
+            boreholeId,
+            category: "missingRequiredField",
+            severity: "warning",
+            message: `取样 ${sample.depth}m 缺少样品类型`,
+            detail: "请补充该样品的类型（原状样/扰动样/岩芯样/水样）",
+            focusType: "sampling",
+            focusId: sample.id,
+          });
+        }
+      }
+
+      for (const wl of bhWL) {
+        const firstSeen = parseFloat(wl.firstSeenLevel);
+        const stable = parseFloat(wl.stableLevel);
+        if (wl.firstSeenLevel && !isNaN(firstSeen) && holeDepth > 0 && firstSeen > holeDepth) {
+          issues.push({
+            id: generateIssueId(),
+            boreholeId,
+            category: "waterLevel",
+            severity: "error",
+            message: `初见水位 ${wl.firstSeenLevel}m 超出孔深 ${holeDepth}m`,
+            focusType: "waterLevel",
+            focusId: wl.id,
+          });
+        }
+        if (wl.stableLevel && !isNaN(stable) && holeDepth > 0 && stable > holeDepth) {
+          issues.push({
+            id: generateIssueId(),
+            boreholeId,
+            category: "waterLevel",
+            severity: "error",
+            message: `稳定水位 ${wl.stableLevel}m 超出孔深 ${holeDepth}m`,
+            focusType: "waterLevel",
+            focusId: wl.id,
+          });
+        }
+        if (!wl.observationTime || !wl.observationTime.trim()) {
+          issues.push({
+            id: generateIssueId(),
+            boreholeId,
+            category: "missingRequiredField",
+            severity: "warning",
+            message: "水位记录缺少观测时间",
+            detail: "请补充水位观测的时间",
+            focusType: "waterLevel",
+            focusId: wl.id,
+          });
         }
       }
 
