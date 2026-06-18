@@ -92,6 +92,7 @@ export interface Permissions {
   canClearData: boolean;
   canExportArchive: boolean;
   canImportArchive: boolean;
+  canViewReviewWorkbench: boolean;
 }
 
 export const rolePermissions: Record<Role, Permissions> = {
@@ -110,6 +111,7 @@ export const rolePermissions: Record<Role, Permissions> = {
     canClearData: true,
     canExportArchive: true,
     canImportArchive: true,
+    canViewReviewWorkbench: true,
   },
   "岩土工程师": {
     canAddRecord: false,
@@ -126,6 +128,7 @@ export const rolePermissions: Record<Role, Permissions> = {
     canClearData: false,
     canExportArchive: true,
     canImportArchive: false,
+    canViewReviewWorkbench: true,
   },
   "项目负责人": {
     canAddRecord: false,
@@ -142,13 +145,14 @@ export const rolePermissions: Record<Role, Permissions> = {
     canClearData: false,
     canExportArchive: true,
     canImportArchive: false,
+    canViewReviewWorkbench: true,
   },
 };
 
 export const roleDescriptions: Record<Role, string> = {
-  "现场编录员": "可新增、编辑和删除所有记录，可导入导出项目归档",
-  "岩土工程师": "仅可校核分层和标贯数据的异常标记和备注，可导出项目归档",
-  "项目负责人": "仅查看看板和导出摘要，可导出项目归档",
+  "现场编录员": "可新增、编辑和删除所有记录，可导入导出项目归档，可查看看板",
+  "岩土工程师": "可在校核工作台集中校核分层和标贯数据、标记异常并填写校核说明，可导出项目归档",
+  "项目负责人": "仅查看看板（含校核工作台）和导出摘要，可导出项目归档",
 };
 
 export const ARCHIVE_VERSION = "1.0.0";
@@ -235,4 +239,51 @@ export interface ImportResult {
   resumedFromProgress?: boolean;
   error?: string;
   warnings: string[];
+}
+
+export interface UncheckedLayerItem {
+  type: "layer";
+  boreholeId: string;
+  layerId: string;
+  startDepth: string;
+  endDepth: string;
+  lithology: string;
+  description: string;
+  checkRemark?: string;
+}
+
+export interface AbnormalSPTItem {
+  type: "spt";
+  boreholeId: string;
+  sptId: string;
+  depth: string;
+  blowCount: string;
+  remark: string;
+  checkRemark?: string;
+}
+
+export interface LayerGapItem {
+  type: "gap";
+  boreholeId: string;
+  gapStart: string;
+  gapEnd: string;
+  description: string;
+}
+
+export interface DepthAnomalyItem {
+  type: "depth";
+  boreholeId: string;
+  holeDepth: string;
+  lastLayerEnd: string;
+  description: string;
+}
+
+export type ReviewItem = UncheckedLayerItem | AbnormalSPTItem | LayerGapItem | DepthAnomalyItem;
+
+export interface ReviewWorkbenchStats {
+  uncheckedLayers: number;
+  abnormalSPT: number;
+  layerGaps: number;
+  depthAnomalies: number;
+  total: number;
 }

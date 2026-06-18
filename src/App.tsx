@@ -28,6 +28,7 @@ import {
 } from "./archive";
 import BoreholeChart from "./components/BoreholeChart";
 import MultiBoreholeChart from "./components/MultiBoreholeChart";
+import ReviewWorkbench from "./components/ReviewWorkbench";
 
 const lithologyOptions = ["黏土", "粉质黏土", "粉土", "粉砂", "细砂", "中砂", "粗砂", "卵石", "圆砾", "强风化岩", "中风化岩", "微风化岩"];
 const soilColorOptions = ["褐黄色", "黄褐色", "灰黄色", "灰白色", "灰色", "灰褐色", "紫红色", "杂色"];
@@ -305,6 +306,7 @@ function App() {
   const [editingWaterLevelId, setEditingWaterLevelId] = useState<string | null>(null);
   const [waterLevelErrors, setWaterLevelErrors] = useState<Partial<Record<keyof WaterLevelRecord, string>>>({});
   const [waterLevelValidationMessage, setWaterLevelValidationMessage] = useState<string>("");
+  const [activeMainView, setActiveMainView] = useState<"borehole" | "review">("borehole");
   const [activeEditorTab, setActiveEditorTab] = useState<"editor" | "chart">("editor");
   const [chartViewMode, setChartViewMode] = useState<"single" | "compare">("single");
   const [selectedBoreholesForCompare, setSelectedBoreholesForCompare] = useState<string[]>([]);
@@ -1020,6 +1022,65 @@ function App() {
   const handleClearCompareSelection = () => {
     setSelectedBoreholesForCompare([]);
   };
+
+  const handleNavigateToBorehole = useCallback((boreholeId: string, focusType?: "layer" | "spt", focusId?: string) => {
+    setActiveMainView("borehole");
+    setChartViewMode("single");
+    setActiveEditorTab("editor");
+    handleSelectBorehole(boreholeId);
+    if (focusType === "layer" && focusId) {
+      setTimeout(() => {
+      const layers = boreholeLayers[boreholeId] || [];
+      const layer = layers.find(l => l.id === focusId);
+      if (layer) {
+        handleEditLayer(layer);
+      }
+    }, 50);
+    } else if (focusType === "spt" && focusId) {
+      setTimeout(() => {
+      const spts = sptRecords[boreholeId] || [];
+      const spt = spts.find(s => s.id === focusId);
+      if (spt) {
+        handleEditSPTRecord(spt);
+      }
+    }, 50);
+    }
+  }, [boreholeLayers, sptRecords]);
+
+  const handleUpdateLayerCheck = useCallback((boreholeId: string, layerId: string, checkRemark: string) => {
+    setBoreholeLayers(prev => ({
+      ...prev,
+      [boreholeId]: (prev[boreholeId] || []).map(l => {
+        if (l.id !== layerId) return l;
+        return {
+          ...l,
+          isChecked: true,
+          checkedBy: currentRole,
+          checkedAt: new Date().toISOString(),
+          checkRemark: checkRemark,
+          description: l.description || checkRemark,
+        };
+      })
+    }));
+  }, [currentRole]);
+
+  const handleUpdateSPTCheck = useCallback((boreholeId: string, sptId: string, isAbnormal: boolean, checkRemark: string) => {
+    setSPTRecords(prev => ({
+      ...prev,
+      [boreholeId]: (prev[boreholeId] || []).map(r => {
+        if (r.id !== sptId) return r;
+        return {
+          ...r,
+          isAbnormal: isAbnormal,
+          isChecked: true,
+          checkedBy: currentRole,
+          checkedAt: new Date().toISOString(),
+          checkRemark: checkRemark,
+          remark: r.remark || checkRemark,
+        };
+      })
+    }));
+  }, [currentRole]);
 
   const compareBoreholeData = useMemo(() => {
     return selectedBoreholesForCompare
@@ -2110,6 +2171,36 @@ function App() {
       </section>
 
       <section className="records-section">
+        <div className="main-view-tabs">
+          <button
+            className={`main-view-tab ${activeMainView === "borehole" ? "active" : ""}`}
+            onClick={() => setActiveMainView("borehole")}
+          >
+            📝 钻孔编辑
+          </button>
+          <button
+            className={`main-view-tab ${activeMainView === "review" ? "active" : ""} ${!permissions.canViewReviewWorkbench ? "btn-disabled" : ""}`}
+            onClick={() => permissions.canViewReviewWorkbench && setActiveMainView("review")}
+            disabled={!permissions.canViewReviewWorkbench}
+            title={!permissions.canViewReviewWorkbench ? "当前角色无查看校核工作台权限" : ""}
+          >
+            🔍 校核工作台
+          </button>
+        </div>
+
+        {activeMainView === "review" ? (
+          <ReviewWorkbench
+            records={records}
+            boreholeLayers={boreholeLayers}
+            sptRecords={sptRecords}
+            permissions={permissions}
+            currentRole={currentRole}
+            onNavigateToBorehole={handleNavigateToBorehole}
+            onUpdateLayerCheck={handleUpdateLayerCheck}
+            onUpdateSPTCheck={handleUpdateSPTCheck}
+          />
+        ) : (
+          <>
         <div className="panel borehole-list-panel">
           <div className="section-heading">
             <div>
@@ -2751,6 +2842,8 @@ function App() {
             </div>
           )}
         </div>
+          </>
+        )}
       </section>
 
       {showPreview && (
