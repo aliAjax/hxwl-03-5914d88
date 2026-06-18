@@ -241,36 +241,6 @@ function MetricCard({ label, value, index }: { label: string; value: string; ind
   );
 }
 
-const emptyLayerForm: Omit<StratumLayer, "id"> = {
-  startDepth: "",
-  endDepth: "",
-  lithology: "",
-  soilColor: "",
-  density: "",
-  description: ""
-};
-
-const emptySPTForm: Omit<SPTRecord, "id" | "layerId"> = {
-  depth: "",
-  blowCount: "",
-  isAbnormal: false,
-  remark: ""
-};
-
-const emptySamplingForm: Omit<SamplingRecord, "id" | "layerId"> = {
-  depth: "",
-  sampleType: "",
-  sampleNumber: "",
-  remark: ""
-};
-
-const emptyWaterLevelForm: Omit<WaterLevelRecord, "id"> = {
-  firstSeenLevel: "",
-  stableLevel: "",
-  observationTime: "",
-  weatherRemark: ""
-};
-
 function App() {
   const [currentRole, setCurrentRole] = useState<Role>("现场编录员");
   const permissions = useMemo(() => rolePermissions[currentRole], [currentRole]);
