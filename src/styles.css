@@ -844,6 +844,35 @@ input {
   margin-bottom: 12px;
 }
 
+.layer-adjacent-hint {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+
+.layer-adjacent-hint small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.auto-fill-tip {
+  color: #0f766e;
+  font-size: 12px;
+  font-style: normal;
+  margin-top: 4px;
+  display: block;
+}
+
+.input-auto-filled {
+  background-color: #f0fdfa;
+  border-color: #99f6e4;
+}
+
 .layer-list-section h4 {
   font-size: 15px;
   margin-bottom: 12px;

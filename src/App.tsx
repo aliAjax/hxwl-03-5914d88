@@ -284,6 +284,8 @@ function App() {
   const [layerErrors, setLayerErrors] = useState<Partial<Record<keyof StratumLayer, string>>>({});
   const [layerValidationMessage, setLayerValidationMessage] = useState<string>("");
   const [gapMessage, setGapMessage] = useState<string>("");
+  const [adjacentLayerHint, setAdjacentLayerHint] = useState<string>("");
+  const [autoFilledStartDepth, setAutoFilledStartDepth] = useState<boolean>(false);
 
   const [sptRecords, setSPTRecords] = useState<BoreholeSPTRecords>({});
   const [sptForm, setSPTForm] = useState<Omit<SPTRecord, "id" | "layerId">>(emptySPTForm);
@@ -585,11 +587,95 @@ function App() {
     return { hasOverlap, gaps };
   }, [currentLayers, editingLayerId, layerForm, holeDepth]);
 
+  const getAdjacentLayers = useCallback((layerId: string | null, startDepth: string, endDepth: string): { prevLayer: StratumLayer | null; nextLayer: StratumLayer | null } => {
+    const sorted = sortedLayers;
+    const start = parseFloat(startDepth);
+    const end = parseFloat(endDepth);
+    let prevLayer: StratumLayer | null = null;
+    let nextLayer: StratumLayer | null = null;
+    for (const layer of sorted) {
+      if (layerId && layer.id === layerId) continue;
+      const ls = parseFloat(layer.startDepth);
+      const le = parseFloat(layer.endDepth);
+      if (le <= start + 0.001) {
+        if (!prevLayer || ls > parseFloat(prevLayer.startDepth)) {
+          prevLayer = layer;
+        }
+      }
+      if (ls >= end - 0.001) {
+        if (!nextLayer || ls < parseFloat(nextLayer.startDepth)) {
+          nextLayer = layer;
+        }
+      }
+    }
+    return { prevLayer, nextLayer };
+  }, [sortedLayers]);
+
+  const checkAdjacentLayerImpact = useCallback(() => {
+    if (!editingLayerId) {
+      setAdjacentLayerHint("");
+      return;
+    }
+    const { prevLayer, nextLayer } = getAdjacentLayers(editingLayerId, layerForm.startDepth, layerForm.endDepth);
+    const start = parseFloat(layerForm.startDepth);
+    const end = parseFloat(layerForm.endDepth);
+    const hints: string[] = [];
+    if (isNaN(start) || isNaN(end)) {
+      setAdjacentLayerHint("");
+      return;
+    }
+    if (prevLayer) {
+      const prevEnd = parseFloat(prevLayer.endDepth);
+      if (Math.abs(prevEnd - start) > 0.001) {
+        if (start < prevEnd - 0.001) {
+          hints.push(`⚠️ 与上一层（${prevLayer.lithology} ${prevLayer.startDepth}~${prevLayer.endDepth}m）重叠`);
+        } else {
+          hints.push(`💡 与上一层（${prevLayer.lithology} ${prevLayer.startDepth}~${prevLayer.endDepth}m）存在间隙 ${(start - prevEnd).toFixed(2)}m 间隙`);
+        }
+      }
+    }
+    if (nextLayer) {
+      const nextStart = parseFloat(nextLayer.startDepth);
+      if (Math.abs(nextStart - end) > 0.001) {
+        if (end > nextStart + 0.001) {
+          hints.push(`⚠️ 与下一层（${nextLayer.lithology} ${nextLayer.startDepth}~${nextLayer.endDepth}m）重叠`);
+        } else {
+          hints.push(`💡 与下一层（${nextLayer.lithology} ${nextLayer.startDepth}~${nextLayer.endDepth}m）存在 ${(nextStart - end).toFixed(2)}m 间隙`);
+        }
+      }
+    }
+    setAdjacentLayerHint(hints.join("；"));
+  }, [editingLayerId, layerForm.startDepth, layerForm.endDepth, getAdjacentLayers]);
+
   const handleLayerInputChange = (field: keyof Omit<StratumLayer, "id">, value: string) => {
     setLayerForm(prev => ({ ...prev, [field]: value }));
     if (layerErrors[field]) setLayerErrors(prev => ({ ...prev, [field]: undefined }));
     if (layerValidationMessage) setLayerValidationMessage("");
+    if (field === "startDepth" || field === "endDepth") {
+      if (field === "startDepth") setAutoFilledStartDepth(false);
+      setTimeout(() => checkAdjacentLayerImpact(), 0);
+    }
   };
+
+  const prepareNewLayerForm = useCallback((boreholeId?: string) => {
+    const targetId = boreholeId || selectedBorehole;
+    const layers = targetId ? (boreholeLayers[targetId] || []) : [];
+    const sorted = [...layers].sort((a, b) => parseFloat(a.startDepth) - parseFloat(b.startDepth));
+    if (sorted.length > 0) {
+      const lastLayer = sorted[sorted.length - 1];
+      setLayerForm({
+        ...emptyLayerForm,
+        startDepth: lastLayer.endDepth,
+      });
+      setAutoFilledStartDepth(true);
+    } else {
+      setLayerForm({ ...emptyLayerForm, startDepth: "0" });
+      setAutoFilledStartDepth(true);
+    }
+    setLayerErrors({});
+    setLayerValidationMessage("");
+    setAdjacentLayerHint("");
+  }, [selectedBorehole, boreholeLayers]);
 
   const handleAddLayer = () => {
     setLayerValidationMessage("");
@@ -600,8 +686,13 @@ function App() {
     if (hasOverlap) { setLayerValidationMessage("该层与现有分层深度重叠，请调整深度范围"); return; }
     if (!selectedBorehole) return;
     const newLayer: StratumLayer = { ...layerForm, id: generateId() };
-    setBoreholeLayers(prev => ({ ...prev, [selectedBorehole]: [...(prev[selectedBorehole] || []), newLayer] }));
-    setLayerForm(emptyLayerForm); setLayerErrors({}); setLayerValidationMessage("");
+    setBoreholeLayers(prev => {
+      const updated = { ...prev, [selectedBorehole]: [...(prev[selectedBorehole] || []), newLayer] };
+      setTimeout(() => {
+        prepareNewLayerForm(selectedBorehole);
+      }, 0);
+      return updated;
+    });
   };
 
   const handleUpdateLayer = () => {
@@ -628,7 +719,7 @@ function App() {
         return { ...l, ...layerForm, id: editingLayerId };
       })
     }));
-    setLayerForm(emptyLayerForm); setEditingLayerId(null); setLayerErrors({}); setLayerValidationMessage("");
+    setLayerForm(emptyLayerForm); setEditingLayerId(null); setLayerErrors({}); setLayerValidationMessage(""); setAdjacentLayerHint(""); setAutoFilledStartDepth(false);
   };
 
   const handleEditLayer = (layer: StratumLayer) => {
@@ -644,16 +735,16 @@ function App() {
       checkedAt: layer.checkedAt,
       checkRemark: layer.checkRemark,
     });
-    setEditingLayerId(layer.id); setLayerErrors({}); setLayerValidationMessage("");
+    setEditingLayerId(layer.id); setLayerErrors({}); setLayerValidationMessage(""); setAdjacentLayerHint(""); setAutoFilledStartDepth(false);
   };
 
   const handleDeleteLayer = (layerId: string) => {
     if (!selectedBorehole) return;
     setBoreholeLayers(prev => ({ ...prev, [selectedBorehole]: prev[selectedBorehole].filter(l => l.id !== layerId) }));
-    if (editingLayerId === layerId) { setLayerForm(emptyLayerForm); setEditingLayerId(null); }
+    if (editingLayerId === layerId) { setLayerForm(emptyLayerForm); setEditingLayerId(null); setAdjacentLayerHint(""); setAutoFilledStartDepth(false); }
   };
 
-  const handleCancelEdit = () => { setLayerForm(emptyLayerForm); setEditingLayerId(null); setLayerErrors({}); setLayerValidationMessage(""); };
+  const handleCancelEdit = () => { setLayerForm(emptyLayerForm); setEditingLayerId(null); setLayerErrors({}); setLayerValidationMessage(""); setAdjacentLayerHint(""); setAutoFilledStartDepth(false); };
 
   const validateSPTForm = useCallback((): { valid: boolean; errors: Partial<Record<keyof SPTRecord, string>> } => {
     const errs: Partial<Record<keyof SPTRecord, string>> = {};
@@ -841,7 +932,10 @@ function App() {
 
   const handleSelectBorehole = (boreholeId: string) => {
     setSelectedBorehole(boreholeId);
-    setLayerForm(emptyLayerForm); setEditingLayerId(null); setLayerErrors({}); setLayerValidationMessage("");
+    setTimeout(() => {
+      prepareNewLayerForm(boreholeId);
+    }, 0);
+    setEditingLayerId(null); setLayerErrors({}); setLayerValidationMessage("");
     setSPTForm(emptySPTForm); setEditingSPTId(null); setSPTErrors({}); setSPTValidationMessage("");
     setSamplingForm(emptySamplingForm); setEditingSamplingId(null); setSamplingErrors({}); setSamplingValidationMessage("");
     setWaterLevelForm(emptyWaterLevelForm); setEditingWaterLevelId(null); setWaterLevelErrors({}); setWaterLevelValidationMessage("");
@@ -2071,7 +2165,7 @@ function App() {
                 ) : (
                   <>
                     <div className="layer-form-grid">
-                      <label><span>起始深度 (m)</span><input type="number" step="0.1" className={`${layerErrors.startDepth ? "input-error" : ""} ${isCheckMode ? "input-readonly" : ""}`} placeholder="起始深度" value={layerForm.startDepth} onChange={(e) => handleLayerInputChange("startDepth", e.target.value)} disabled={isCheckMode} readOnly={isCheckMode} />{layerErrors.startDepth && <em className="error-tip">{layerErrors.startDepth}</em>}{isCheckMode && <em className="check-tip">校核模式，不可修改</em>}</label>
+                      <label><span>起始深度 (m)</span><input type="number" step="0.1" className={`${layerErrors.startDepth ? "input-error" : ""} ${isCheckMode ? "input-readonly" : ""} ${autoFilledStartDepth && !editingLayerId ? "input-auto-filled" : ""}`} placeholder="起始深度" value={layerForm.startDepth} onChange={(e) => handleLayerInputChange("startDepth", e.target.value)} disabled={isCheckMode} readOnly={isCheckMode} />{layerErrors.startDepth && <em className="error-tip">{layerErrors.startDepth}</em>}{isCheckMode && <em className="check-tip">校核模式，不可修改</em>}{autoFilledStartDepth && !editingLayerId && !layerErrors.startDepth && <em className="auto-fill-tip">💡 接续上一层终止深度，可手动修改</em>}</label>
                       <label><span>终止深度 (m)</span><input type="number" step="0.1" className={`${layerErrors.endDepth ? "input-error" : ""} ${isCheckMode ? "input-readonly" : ""}`} placeholder="终止深度" value={layerForm.endDepth} onChange={(e) => handleLayerInputChange("endDepth", e.target.value)} disabled={isCheckMode} readOnly={isCheckMode} />{layerErrors.endDepth && <em className="error-tip">{layerErrors.endDepth}</em>}{isCheckMode && <em className="check-tip">校核模式，不可修改</em>}</label>
                       <label><span>岩性</span><select className={`${layerErrors.lithology ? "input-error" : ""} ${isCheckMode ? "input-readonly" : ""}`} value={layerForm.lithology} onChange={(e) => handleLayerInputChange("lithology", e.target.value)} disabled={isCheckMode}><option value="">选择岩性</option>{lithologyOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select>{layerErrors.lithology && <em className="error-tip">{layerErrors.lithology}</em>}{isCheckMode && <em className="check-tip">校核模式，不可修改</em>}</label>
                       <label><span>土色</span><select className={`${layerErrors.soilColor ? "input-error" : ""} ${isCheckMode ? "input-readonly" : ""}`} value={layerForm.soilColor} onChange={(e) => handleLayerInputChange("soilColor", e.target.value)} disabled={isCheckMode}><option value="">选择土色</option>{soilColorOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select>{layerErrors.soilColor && <em className="error-tip">{layerErrors.soilColor}</em>}{isCheckMode && <em className="check-tip">校核模式，不可修改</em>}</label>
@@ -2079,6 +2173,7 @@ function App() {
                       <label className="full-width"><span>描述{isCheckMode && <em className="inline-check-tip">(校核说明)</em>}</span><input placeholder={isCheckMode ? "请填写校核说明或备注" : "分层描述"} value={layerForm.description} onChange={(e) => handleLayerInputChange("description", e.target.value)} /></label>
                     </div>
                     {layerValidationMessage && (<div className="layer-validation-error">{layerValidationMessage}</div>)}
+                    {adjacentLayerHint && editingLayerId && (<div className="layer-adjacent-hint">{adjacentLayerHint}<br /><small>（仅提示，不会自动修改相邻层数据）</small></div>)}
                     {gapMessage && sortedLayers.length > 0 && (<div className="layer-gap-warning">{gapMessage}</div>)}
                     <div className="layer-form-actions">
                       {editingLayerId ? (
