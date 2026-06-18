@@ -589,6 +589,15 @@ function App() {
 
   const getAdjacentLayers = useCallback((layerId: string | null, startDepth: string, endDepth: string): { prevLayer: StratumLayer | null; nextLayer: StratumLayer | null } => {
     const sorted = sortedLayers;
+    if (layerId) {
+      const currentIndex = sorted.findIndex(layer => layer.id === layerId);
+      if (currentIndex !== -1) {
+        return {
+          prevLayer: currentIndex > 0 ? sorted[currentIndex - 1] : null,
+          nextLayer: currentIndex < sorted.length - 1 ? sorted[currentIndex + 1] : null,
+        };
+      }
+    }
     const start = parseFloat(startDepth);
     const end = parseFloat(endDepth);
     let prevLayer: StratumLayer | null = null;
@@ -611,10 +620,10 @@ function App() {
     return { prevLayer, nextLayer };
   }, [sortedLayers]);
 
-  const checkAdjacentLayerImpact = useCallback(() => {
-    const { prevLayer, nextLayer } = getAdjacentLayers(editingLayerId, layerForm.startDepth, layerForm.endDepth);
-    const start = parseFloat(layerForm.startDepth);
-    const end = parseFloat(layerForm.endDepth);
+  const checkAdjacentLayerImpact = useCallback((formSnapshot: Omit<StratumLayer, "id"> = layerForm) => {
+    const { prevLayer, nextLayer } = getAdjacentLayers(editingLayerId, formSnapshot.startDepth, formSnapshot.endDepth);
+    const start = parseFloat(formSnapshot.startDepth);
+    const end = parseFloat(formSnapshot.endDepth);
     const hints: string[] = [];
     if (isNaN(start) || isNaN(end)) {
       setAdjacentLayerHint("");
@@ -666,15 +675,16 @@ function App() {
       }
     }
     setAdjacentLayerHint(hints.join("；"));
-  }, [editingLayerId, layerForm.startDepth, layerForm.endDepth, getAdjacentLayers]);
+  }, [editingLayerId, layerForm, getAdjacentLayers]);
 
   const handleLayerInputChange = (field: keyof Omit<StratumLayer, "id">, value: string) => {
-    setLayerForm(prev => ({ ...prev, [field]: value }));
+    const nextForm = { ...layerForm, [field]: value };
+    setLayerForm(nextForm);
     if (layerErrors[field]) setLayerErrors(prev => ({ ...prev, [field]: undefined }));
     if (layerValidationMessage) setLayerValidationMessage("");
     if (field === "startDepth" || field === "endDepth") {
       if (field === "startDepth") setAutoFilledStartDepth(false);
-      setTimeout(() => checkAdjacentLayerImpact(), 0);
+      checkAdjacentLayerImpact(nextForm);
     }
   };
 
