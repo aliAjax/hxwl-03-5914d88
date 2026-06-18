@@ -181,7 +181,7 @@ export default function PrintReport({
   };
 
   return (
-    <div className="print-report-overlay">
+    <div className="print-report-overlay print-report-section">
       <div className="print-report-outer">
         <div className="print-report-toolbar no-print">
           <div className="toolbar-left">

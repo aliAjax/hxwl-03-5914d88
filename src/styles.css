@@ -3178,7 +3178,12 @@ button:disabled:hover {
     print-color-adjust: exact !important;
   }
 
-  .app-shell > *:not(.borehole-chart-section),
+  .print-report-overlay {
+    display: block !important;
+  }
+
+  body:has(.print-report-overlay) .app-shell > *:not(.print-report-overlay),
+  body:not(:has(.print-report-overlay)) .app-shell > *:not(.borehole-chart-section),
   .hero,
   .metrics-grid,
   .workspace,
@@ -5821,10 +5826,13 @@ button:disabled:hover {
     position: static !important;
     background: #ffffff !important;
     backdrop-filter: none !important;
+    display: block !important;
+    z-index: auto !important;
   }
 
   .print-report-outer {
     display: block !important;
+    width: 100% !important;
   }
 
   .print-report-toolbar.no-print {
@@ -5835,14 +5843,16 @@ button:disabled:hover {
     padding: 0 !important;
     background: #ffffff !important;
     overflow: visible !important;
+    width: 100% !important;
   }
 
   .print-report-page {
     width: 100% !important;
     min-height: auto !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     padding: 0 !important;
     box-shadow: none !important;
+    max-width: none !important;
   }
 
   @page {
@@ -5856,9 +5866,10 @@ button:disabled:hover {
     print-color-adjust: exact !important;
     margin: 0 !important;
     padding: 0 !important;
+    width: 100% !important;
   }
 
-  .app-shell > *:not(.print-report-section),
+  body:has(.print-report-overlay) .app-shell > *:not(.print-report-overlay),
   .hero,
   .metrics-grid,
   .workspace,
@@ -5874,11 +5885,16 @@ button:disabled:hover {
     display: none !important;
   }
 
-  .app-shell:has(.print-report-overlay) {
+  .app-shell {
     width: 100% !important;
     max-width: none !important;
     padding: 0 !important;
     margin: 0 !important;
+  }
+
+  .print-report-section,
+  .print-section {
+    display: block !important;
   }
 
   .borehole-chart-container {
