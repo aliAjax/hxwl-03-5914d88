@@ -74,7 +74,7 @@ export default function ReviewWorkbench({
       const bhId = record["钻孔编号"];
       const bhSPT = sptRecords[bhId] || [];
       for (const spt of bhSPT) {
-        if (spt.isAbnormal || !spt.isChecked) {
+        if (spt.isAbnormal && !spt.isChecked) {
           result.push({
             type: "spt",
             boreholeId: bhId,
@@ -196,7 +196,7 @@ export default function ReviewWorkbench({
 
   const tabConfigs: { key: ReviewTab; label: string; count: number; icon: string; colorClass: string }[] = [
     { key: "layers", label: "未校核分层", count: stats.uncheckedLayers, icon: "📋", colorClass: "tab-layer" },
-    { key: "spt", label: "标贯异常/未校核", count: stats.abnormalSPT, icon: "🔨", colorClass: "tab-spt" },
+    { key: "spt", label: "异常标贯（待校核）", count: stats.abnormalSPT, icon: "🔨", colorClass: "tab-spt" },
     { key: "gaps", label: "分层缺口", count: stats.layerGaps, icon: "⚠️", colorClass: "tab-gap" },
     { key: "depth", label: "孔深异常", count: stats.depthAnomalies, icon: "📏", colorClass: "tab-depth" },
   ];
@@ -354,8 +354,8 @@ export default function ReviewWorkbench({
                 {abnormalSPT.length === 0 ? (
                   <div className="review-empty-state">
                     <span className="review-empty-icon">✅</span>
-                    <h4>所有标贯记录已完成校核</h4>
-                    <p>暂无异常或待校核的标贯记录</p>
+                    <h4>所有异常标贯已完成校核</h4>
+                    <p>暂无可疑的异常标贯记录</p>
                   </div>
                 ) : (
                   <table className="review-table">
