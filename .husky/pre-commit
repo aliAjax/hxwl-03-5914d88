@@ -1,0 +1,41 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🚀 运行本地质量门禁..."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+echo "📝 步骤 1/4: 运行 lint-staged..."
+npx lint-staged
+if [ $? -ne 0 ]; then
+  echo "❌ lint-staged 检查失败，请修复后再提交"
+  exit 1
+fi
+
+echo ""
+echo "🔍 步骤 2/4: 类型检查..."
+npm run typecheck
+if [ $? -ne 0 ]; then
+  echo "❌ TypeScript 类型检查失败，请修复后再提交"
+  exit 1
+fi
+
+echo ""
+echo "🏗️  步骤 3/4: 构建验证..."
+npm run build
+if [ $? -ne 0 ]; then
+  echo "❌ 构建失败，请修复后再提交"
+  exit 1
+fi
+
+echo ""
+echo "🧪 步骤 4/4: 单元测试..."
+npm run test
+if [ $? -ne 0 ]; then
+  echo "❌ 单元测试失败，请修复后再提交"
+  exit 1
+fi
+
+echo ""
+echo "✅━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "✅ 所有质量门禁检查通过！"
+echo "✅━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

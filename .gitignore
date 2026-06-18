@@ -9,3 +9,15 @@ yarn-error.log*
 pnpm-debug.log*
 .idea
 .vscode
+
+coverage
+.nyc_output
+*.lcov
+
+.husky/_
+
+*.local
+
+.vite
+.temp
+.tmp

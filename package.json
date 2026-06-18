@@ -3,8 +3,18 @@
     "dev": "vite --host 0.0.0.0 --port 5103",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0 --port 5103",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings 0",
+    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix",
+    "quality": "npm run typecheck && npm run build && npm run test",
+    "quality:strict": "npm run typecheck && npm run build && npm run test:coverage",
+    "smoke": "node scripts/smoke-test.mjs",
+    "prepare": "husky",
+    "precommit": "lint-staged && npm run quality"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.0",
@@ -14,10 +24,27 @@
     "vite": "^7.0.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.2.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@vitest/coverage-v8": "^4.1.9",
     "@vitest/ui": "^4.1.9",
+    "eslint": "^9.20.1",
+    "eslint-plugin-react": "^7.37.4",
+    "eslint-plugin-react-hooks": "^5.1.0",
     "happy-dom": "^20.10.6",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.3",
     "vitest": "^4.1.9"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx}": [
+      "eslint --max-warnings 0",
+      "bash -c 'npm run typecheck'"
+    ],
+    "src/**/*.test.{ts,tsx}": [
+      "bash -c 'npm run test'"
+    ]
   }
 }
