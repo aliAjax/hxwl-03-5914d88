@@ -822,6 +822,16 @@ input {
   margin-bottom: 20px;
   padding-bottom: 18px;
   border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+
+.layer-form-actions .primary-action {
+  flex: 1;
+}
+
+.layer-form-actions .secondary-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .layer-validation-error {
@@ -853,6 +863,24 @@ input {
   font-size: 13px;
   margin-bottom: 12px;
   line-height: 1.6;
+}
+
+.layer-adjacent-hint.hint-success {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+}
+
+.layer-adjacent-hint.hint-warning {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+}
+
+.layer-adjacent-hint.hint-info {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
 }
 
 .layer-adjacent-hint small {

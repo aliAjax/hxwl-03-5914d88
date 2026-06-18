@@ -612,10 +612,6 @@ function App() {
   }, [sortedLayers]);
 
   const checkAdjacentLayerImpact = useCallback(() => {
-    if (!editingLayerId) {
-      setAdjacentLayerHint("");
-      return;
-    }
     const { prevLayer, nextLayer } = getAdjacentLayers(editingLayerId, layerForm.startDepth, layerForm.endDepth);
     const start = parseFloat(layerForm.startDepth);
     const end = parseFloat(layerForm.endDepth);
@@ -624,23 +620,48 @@ function App() {
       setAdjacentLayerHint("");
       return;
     }
-    if (prevLayer) {
-      const prevEnd = parseFloat(prevLayer.endDepth);
-      if (Math.abs(prevEnd - start) > 0.001) {
-        if (start < prevEnd - 0.001) {
-          hints.push(`⚠️ 与上一层（${prevLayer.lithology} ${prevLayer.startDepth}~${prevLayer.endDepth}m）重叠`);
+    if (!editingLayerId) {
+      if (prevLayer) {
+        const prevEnd = parseFloat(prevLayer.endDepth);
+        if (Math.abs(prevEnd - start) < 0.001) {
+          hints.push(`✅ 与上一层（${prevLayer.lithology} ${prevLayer.startDepth}~${prevLayer.endDepth}m）完美接续`);
+        } else if (start < prevEnd - 0.001) {
+          hints.push(`⚠️ 与上一层（${prevLayer.lithology} ${prevLayer.startDepth}~${prevLayer.endDepth}m）重叠 ${(prevEnd - start).toFixed(2)}m`);
         } else {
-          hints.push(`💡 与上一层（${prevLayer.lithology} ${prevLayer.startDepth}~${prevLayer.endDepth}m）存在间隙 ${(start - prevEnd).toFixed(2)}m 间隙`);
+          hints.push(`💡 与上一层（${prevLayer.lithology} ${prevLayer.startDepth}~${prevLayer.endDepth}m）存在 ${(start - prevEnd).toFixed(2)}m 间隙`);
         }
+      } else if (Math.abs(start) < 0.001) {
+        hints.push(`✅ 起始于地表 0m，接续正确`);
+      } else if (start > 0) {
+        hints.push(`💡 与地表存在 ${start.toFixed(2)}m 间隙`);
       }
-    }
-    if (nextLayer) {
-      const nextStart = parseFloat(nextLayer.startDepth);
-      if (Math.abs(nextStart - end) > 0.001) {
-        if (end > nextStart + 0.001) {
-          hints.push(`⚠️ 与下一层（${nextLayer.lithology} ${nextLayer.startDepth}~${nextLayer.endDepth}m）重叠`);
+    } else {
+      if (prevLayer) {
+        const prevEnd = parseFloat(prevLayer.endDepth);
+        if (Math.abs(prevEnd - start) > 0.001) {
+          if (start < prevEnd - 0.001) {
+            hints.push(`⚠️ 与上一层（${prevLayer.lithology} ${prevLayer.startDepth}~${prevLayer.endDepth}m）重叠 ${(prevEnd - start).toFixed(2)}m`);
+          } else {
+            hints.push(`💡 与上一层（${prevLayer.lithology} ${prevLayer.startDepth}~${prevLayer.endDepth}m）存在 ${(start - prevEnd).toFixed(2)}m 间隙`);
+          }
         } else {
-          hints.push(`💡 与下一层（${nextLayer.lithology} ${nextLayer.startDepth}~${nextLayer.endDepth}m）存在 ${(nextStart - end).toFixed(2)}m 间隙`);
+          hints.push(`✅ 与上一层（${prevLayer.lithology}）完美接续`);
+        }
+      } else if (Math.abs(start) < 0.001) {
+        hints.push(`✅ 起始于地表 0m，接续正确`);
+      } else if (start > 0) {
+        hints.push(`💡 与地表存在 ${start.toFixed(2)}m 间隙`);
+      }
+      if (nextLayer) {
+        const nextStart = parseFloat(nextLayer.startDepth);
+        if (Math.abs(nextStart - end) > 0.001) {
+          if (end > nextStart + 0.001) {
+            hints.push(`⚠️ 与下一层（${nextLayer.lithology} ${nextLayer.startDepth}~${nextLayer.endDepth}m）重叠 ${(end - nextStart).toFixed(2)}m`);
+          } else {
+            hints.push(`💡 与下一层（${nextLayer.lithology} ${nextLayer.startDepth}~${nextLayer.endDepth}m）存在 ${(nextStart - end).toFixed(2)}m 间隙`);
+          }
+        } else {
+          hints.push(`✅ 与下一层（${nextLayer.lithology}）完美接续`);
         }
       }
     }
@@ -740,11 +761,38 @@ function App() {
 
   const handleDeleteLayer = (layerId: string) => {
     if (!selectedBorehole) return;
-    setBoreholeLayers(prev => ({ ...prev, [selectedBorehole]: prev[selectedBorehole].filter(l => l.id !== layerId) }));
-    if (editingLayerId === layerId) { setLayerForm(emptyLayerForm); setEditingLayerId(null); setAdjacentLayerHint(""); setAutoFilledStartDepth(false); }
+    setBoreholeLayers(prev => {
+      const updated = {
+        ...prev,
+        [selectedBorehole]: prev[selectedBorehole].filter(l => l.id !== layerId),
+      };
+      if (editingLayerId === layerId) {
+        setTimeout(() => {
+          prepareNewLayerForm(selectedBorehole);
+        }, 0);
+      }
+      return updated;
+    });
+    if (editingLayerId === layerId) {
+      setEditingLayerId(null);
+      setAdjacentLayerHint("");
+      setAutoFilledStartDepth(false);
+    } else if (!editingLayerId) {
+      setTimeout(() => {
+        prepareNewLayerForm(selectedBorehole);
+      }, 0);
+    }
   };
 
-  const handleCancelEdit = () => { setLayerForm(emptyLayerForm); setEditingLayerId(null); setLayerErrors({}); setLayerValidationMessage(""); setAdjacentLayerHint(""); setAutoFilledStartDepth(false); };
+  const handleCancelEdit = () => {
+    setEditingLayerId(null);
+    setLayerErrors({});
+    setLayerValidationMessage("");
+    setAdjacentLayerHint("");
+    setTimeout(() => {
+      prepareNewLayerForm();
+    }, 0);
+  };
 
   const validateSPTForm = useCallback((): { valid: boolean; errors: Partial<Record<keyof SPTRecord, string>> } => {
     const errs: Partial<Record<keyof SPTRecord, string>> = {};
@@ -953,6 +1001,25 @@ function App() {
     if (prevEnd < holeDepth - 0.001) gaps.push(`${prevEnd.toFixed(2)}m ~ ${holeDepth.toFixed(2)}m`);
     setGapMessage(gaps.length > 0 ? `存在缺口区间：${gaps.join("、")}` : "");
   }, [sortedLayers, holeDepth]);
+
+  useEffect(() => {
+    if (!selectedBorehole || isLoading) return;
+    if (editingLayerId) return;
+    if (layerForm.startDepth && !autoFilledStartDepth) return;
+    const timer = setTimeout(() => {
+      prepareNewLayerForm(selectedBorehole);
+      setTimeout(() => checkAdjacentLayerImpact(), 0);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [selectedBorehole, isLoading, editingLayerId]);
+
+  useEffect(() => {
+    if (!selectedBorehole || isLoading || editingLayerId) return;
+    const timer = setTimeout(() => {
+      checkAdjacentLayerImpact();
+    }, 10);
+    return () => clearTimeout(timer);
+  }, [sortedLayers, selectedBorehole, isLoading, editingLayerId, checkAdjacentLayerImpact]);
 
   const hasActiveFilters = useMemo(() => {
     return filters.lithology !== null || filters.hasGap !== null || filters.hasAbnormalSPT !== null || filters.missingStableWaterLevel !== null;
@@ -2173,7 +2240,11 @@ function App() {
                       <label className="full-width"><span>描述{isCheckMode && <em className="inline-check-tip">(校核说明)</em>}</span><input placeholder={isCheckMode ? "请填写校核说明或备注" : "分层描述"} value={layerForm.description} onChange={(e) => handleLayerInputChange("description", e.target.value)} /></label>
                     </div>
                     {layerValidationMessage && (<div className="layer-validation-error">{layerValidationMessage}</div>)}
-                    {adjacentLayerHint && editingLayerId && (<div className="layer-adjacent-hint">{adjacentLayerHint}<br /><small>（仅提示，不会自动修改相邻层数据）</small></div>)}
+                    {adjacentLayerHint && (<div className={`layer-adjacent-hint ${adjacentLayerHint.includes("⚠️") ? "hint-warning" : adjacentLayerHint.includes("✅") ? "hint-success" : "hint-info"}`}>
+                        {adjacentLayerHint}
+                        {editingLayerId && <><br /><small>（仅提示，不会自动修改相邻层数据）</small></>}
+                        {!editingLayerId && !autoFilledStartDepth && sortedLayers.length > 0 && <><br /><small>点击「接续上一层」可快速填入上一层终止深度</small></>}
+                      </div>)}
                     {gapMessage && sortedLayers.length > 0 && (<div className="layer-gap-warning">{gapMessage}</div>)}
                     <div className="layer-form-actions">
                       {editingLayerId ? (
@@ -2184,9 +2255,20 @@ function App() {
                           </button>
                         </>
                       ) : (
-                        <button className={`primary-action ${isCheckMode ? "btn-disabled" : ""}`} onClick={!isCheckMode ? handleAddLayer : undefined} disabled={isCheckMode} title={isCheckMode ? "校核模式，不可新增分层" : ""}>
+                        <>
+                          {sortedLayers.length > 0 && (
+                            <button 
+                              className="secondary-btn" 
+                              onClick={() => prepareNewLayerForm()}
+                              title="将起始深度设为上一层的终止深度"
+                            >
+                              ↓ 接续上一层
+                            </button>
+                          )}
+                          <button className={`primary-action ${isCheckMode ? "btn-disabled" : ""}`} onClick={!isCheckMode ? handleAddLayer : undefined} disabled={isCheckMode} title={isCheckMode ? "校核模式，不可新增分层" : ""}>
                           {isCheckMode ? "无权限新增" : "添加分层"}
                         </button>
+                        </>
                       )}
                     </div>
                   </>
