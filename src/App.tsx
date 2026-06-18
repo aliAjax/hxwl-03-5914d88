@@ -27,6 +27,7 @@ import {
   clearImportProgress,
 } from "./archive";
 import BoreholeChart from "./components/BoreholeChart";
+import MultiBoreholeChart from "./components/MultiBoreholeChart";
 
 const lithologyOptions = ["黏土", "粉质黏土", "粉土", "粉砂", "细砂", "中砂", "粗砂", "卵石", "圆砾", "强风化岩", "中风化岩", "微风化岩"];
 const soilColorOptions = ["褐黄色", "黄褐色", "灰黄色", "灰白色", "灰色", "灰褐色", "紫红色", "杂色"];
@@ -305,6 +306,8 @@ function App() {
   const [waterLevelErrors, setWaterLevelErrors] = useState<Partial<Record<keyof WaterLevelRecord, string>>>({});
   const [waterLevelValidationMessage, setWaterLevelValidationMessage] = useState<string>("");
   const [activeEditorTab, setActiveEditorTab] = useState<"editor" | "chart">("editor");
+  const [chartViewMode, setChartViewMode] = useState<"single" | "compare">("single");
+  const [selectedBoreholesForCompare, setSelectedBoreholesForCompare] = useState<string[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -998,6 +1001,51 @@ function App() {
     setSamplingForm(emptySamplingForm); setEditingSamplingId(null); setSamplingErrors({}); setSamplingValidationMessage("");
     setWaterLevelForm(emptyWaterLevelForm); setEditingWaterLevelId(null); setWaterLevelErrors({}); setWaterLevelValidationMessage("");
   };
+
+  const handleToggleBoreholeForCompare = (boreholeId: string) => {
+    setSelectedBoreholesForCompare(prev => {
+      if (prev.includes(boreholeId)) {
+        return prev.filter(id => id !== boreholeId);
+      } else {
+        return [...prev, boreholeId];
+      }
+    });
+  };
+
+  const handleSelectAllForCompare = () => {
+    const allIds = filteredRecords.map(r => r["钻孔编号"]);
+    setSelectedBoreholesForCompare(allIds);
+  };
+
+  const handleClearCompareSelection = () => {
+    setSelectedBoreholesForCompare([]);
+  };
+
+  const compareBoreholeData = useMemo(() => {
+    return selectedBoreholesForCompare
+      .map(id => {
+        const record = records.find(r => r["钻孔编号"] === id);
+        if (!record) return null;
+        const holeDepth = parseFloat(record["孔深"]) || 0;
+        const layers = boreholeLayers[id] || [];
+        const sptRecordsList = sptRecords[id] || [];
+        const waterLevelRecordsList = waterLevelRecords[id] || [];
+        return {
+          boreholeId: id,
+          holeDepth,
+          layers,
+          sptRecords: sptRecordsList,
+          waterLevelRecords: waterLevelRecordsList,
+        };
+      })
+      .filter(Boolean) as {
+      boreholeId: string;
+      holeDepth: number;
+      layers: StratumLayer[];
+      sptRecords: SPTRecord[];
+      waterLevelRecords: WaterLevelRecord[];
+    }[];
+  }, [selectedBoreholesForCompare, records, boreholeLayers, sptRecords, waterLevelRecords]);
 
   useEffect(() => {
     if (sortedLayers.length === 0 || holeDepth === 0) { setGapMessage(""); return; }
@@ -2068,23 +2116,80 @@ function App() {
               <p>钻孔数据</p>
               <h2>选择钻孔</h2>
             </div>
-            <button
-              className={`${!permissions.canExportSummary ? "btn-disabled" : ""}`}
-              onClick={permissions.canExportSummary ? () => setShowPreview(true) : undefined}
-              disabled={!permissions.canExportSummary}
-              title={!permissions.canExportSummary ? "当前角色无导出权限" : ""}
-            >
-              {permissions.canExportSummary ? "导出摘要" : "无权限导出"}
-            </button>
+            <div className="section-header-actions">
+              <button
+                className={`compare-toggle-btn ${chartViewMode === "compare" ? "active" : ""} ${!permissions.canViewChart ? "btn-disabled" : ""}`}
+                onClick={() => {
+                  if (!permissions.canViewChart) return;
+                  const nextMode = chartViewMode === "single" ? "compare" : "single";
+                  setChartViewMode(nextMode);
+                  if (nextMode === "compare" && selectedBorehole && !selectedBoreholesForCompare.includes(selectedBorehole)) {
+                    setSelectedBoreholesForCompare(prev => [...prev, selectedBorehole]);
+                  }
+                  if (nextMode === "compare") {
+                    setActiveEditorTab("chart");
+                  }
+                }}
+                disabled={!permissions.canViewChart}
+                title={!permissions.canViewChart ? "当前角色无查看柱状图权限" : "切换多钻孔对比模式"}
+              >
+                {chartViewMode === "compare" ? "🔄 单孔模式" : "📊 对比模式"}
+              </button>
+              <button
+                className={`${!permissions.canExportSummary ? "btn-disabled" : ""}`}
+                onClick={permissions.canExportSummary ? () => setShowPreview(true) : undefined}
+                disabled={!permissions.canExportSummary}
+                title={!permissions.canExportSummary ? "当前角色无导出权限" : ""}
+              >
+                {permissions.canExportSummary ? "导出摘要" : "无权限导出"}
+              </button>
+            </div>
           </div>
+
+          {chartViewMode === "compare" && (
+            <div className="compare-selection-bar">
+              <span className="compare-selection-info">
+                已选择 <strong>{selectedBoreholesForCompare.length}</strong> / {filteredRecords.length} 个钻孔
+              </span>
+              <div className="compare-selection-actions">
+                <button className="link-btn" onClick={handleSelectAllForCompare}>全选</button>
+                <button className="link-btn" onClick={handleClearCompareSelection}>清空</button>
+              </div>
+            </div>
+          )}
+
           <div className="borehole-list">
             {filteredRecords.map((record, index: number) => {
               const bhSPT = sptRecords[record["钻孔编号"]] || [];
               const bhSampling = samplingRecords[record["钻孔编号"]] || [];
               const latestObservationText = getLatestWaterLevelObservationText(record["钻孔编号"]);
               const isEditingThis = editingRecordId === record["钻孔编号"];
+              const isSelectedForCompare = selectedBoreholesForCompare.includes(record["钻孔编号"]);
+              const isSelected = chartViewMode === "compare" ? isSelectedForCompare : selectedBorehole === record["钻孔编号"];
+
+              const handleItemClick = () => {
+                if (chartViewMode === "compare") {
+                  handleToggleBoreholeForCompare(record["钻孔编号"]);
+                } else {
+                  handleSelectBorehole(record["钻孔编号"]);
+                }
+              };
+
               return (
-                <article key={record["钻孔编号"] + "-" + index} className={`borehole-item ${selectedBorehole === record["钻孔编号"] ? "borehole-selected" : ""} ${isEditingThis ? "borehole-editing" : ""}`} onClick={() => handleSelectBorehole(record["钻孔编号"])}>
+                <article
+                  key={record["钻孔编号"] + "-" + index}
+                  className={`borehole-item ${isSelected ? "borehole-selected" : ""} ${isEditingThis ? "borehole-editing" : ""} ${chartViewMode === "compare" ? "compare-mode" : ""}`}
+                  onClick={handleItemClick}
+                >
+                  {chartViewMode === "compare" && (
+                    <div className="borehole-checkbox" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={isSelectedForCompare}
+                        onChange={() => handleToggleBoreholeForCompare(record["钻孔编号"])}
+                      />
+                    </div>
+                  )}
                   <div className="borehole-index">{String(index + 1).padStart(2, "0")}</div>
                   <div className="borehole-info">
                     <h3>
@@ -2121,15 +2226,21 @@ function App() {
         <div className="panel layer-editor-panel borehole-chart-section">
           <div className="section-heading">
             <div>
-              <p>地层分层</p>
+              <p>{chartViewMode === "compare" ? "多钻孔对比" : "地层分层"}</p>
               <h2>
-                {selectedBorehole ? `${selectedBorehole} · ${activeEditorTab === "editor" ? "分层编辑器" : "柱状图"}` : "请选择钻孔"}
-                {selectedRecord && <span className="hole-depth-tag">孔深 {selectedRecord["孔深"]}m</span>}
+                {chartViewMode === "compare"
+                  ? `对比视图 · ${selectedBoreholesForCompare.length} 个钻孔`
+                  : selectedBorehole
+                  ? `${selectedBorehole} · ${activeEditorTab === "editor" ? "分层编辑器" : "柱状图"}`
+                  : "请选择钻孔"}
+                {!chartViewMode && selectedRecord && <span className="hole-depth-tag">孔深 {selectedRecord["孔深"]}m</span>}
               </h2>
             </div>
           </div>
 
-          {selectedBorehole ? (
+          {chartViewMode === "compare" ? (
+            <MultiBoreholeChart boreholes={compareBoreholeData} />
+          ) : selectedBorehole ? (
             <>
               <div className="editor-tabs">
                 <button

@@ -4201,3 +4201,366 @@ button:disabled:hover {
     gap: 4px;
   }
 }
+
+.section-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.compare-toggle-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #374151;
+}
+
+.compare-toggle-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.compare-toggle-btn.active {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #ffffff;
+}
+
+.compare-toggle-btn.btn-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.compare-selection-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.compare-selection-info {
+  font-size: 13px;
+  color: #0f766e;
+}
+
+.compare-selection-info strong {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.compare-selection-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: #0f766e;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.link-btn:hover {
+  color: #0d6e66;
+}
+
+.borehole-item.compare-mode {
+  cursor: pointer;
+}
+
+.borehole-item.compare-mode:hover {
+  background: #f0fdfa;
+}
+
+.borehole-checkbox {
+  display: flex;
+  align-items: center;
+  padding-right: 4px;
+}
+
+.borehole-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #0f766e;
+}
+
+.multi-borehole-chart-container {
+  width: 100%;
+}
+
+.multi-borehole-chart-container .chart-header {
+  margin-bottom: 12px;
+}
+
+.depth-diff-hint {
+  color: #d97706;
+  margin-left: 8px;
+  font-size: 12px;
+}
+
+.multi-issues .multi-issues-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.borehole-issues-block {
+  background: #ffffff;
+  border-radius: 6px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.borehole-issues-title {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.borehole-id-tag {
+  font-weight: 700;
+  color: #0f766e;
+  font-size: 13px;
+}
+
+.borehole-issues-block .issues-list {
+  max-height: 160px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.borehole-issues-block .issue-item {
+  padding: 4px 0;
+  font-size: 12px;
+  border-bottom: none;
+}
+
+.multi-borehole-chart {
+  display: flex;
+  position: relative;
+  min-width: 100%;
+}
+
+.chart-scale.multi-scale {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  background: #f9fafb;
+  flex-shrink: 0;
+}
+
+.multi-chart-columns {
+  display: flex;
+  gap: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.borehole-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  flex: 1;
+  border-right: 1px solid #e5e7eb;
+}
+
+.borehole-column:last-child {
+  border-right: none;
+}
+
+.borehole-column-header {
+  padding: 8px 10px;
+  background: #f8fafc;
+  border-bottom: 2px solid #0f766e;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.borehole-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.borehole-meta {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.status-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.status-badge.error-badge {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.status-badge.warning-badge {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.borehole-column-body {
+  display: flex;
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.column-lithology.multi-lithology {
+  flex: 1;
+  position: relative;
+  min-width: 100px;
+}
+
+.column-spt.multi-spt {
+  width: 60px;
+  flex-shrink: 0;
+  position: relative;
+  border-left: 1px solid #e5e7eb;
+}
+
+.hole-end-marker {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.hole-end-line {
+  flex: 1;
+  height: 3px;
+  background: repeating-linear-gradient(
+    90deg,
+    #6b7280 0px,
+    #6b7280 6px,
+    transparent 6px,
+    transparent 10px
+  );
+}
+
+.hole-end-label {
+  position: absolute;
+  right: 4px;
+  top: -10px;
+  font-size: 10px;
+  color: #6b7280;
+  background: #ffffff;
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid #d1d5db;
+  white-space: nowrap;
+}
+
+.borehole-column-footer {
+  padding: 8px 10px;
+  background: #f8fafc;
+  border-top: 1px solid #e5e7eb;
+  font-size: 11px;
+  color: #475569;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.layer-count,
+.spt-count {
+  display: flex;
+  justify-content: space-between;
+}
+
+.water-level-info-mini {
+  display: flex;
+  justify-content: space-between;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.water-level-info-mini.missing {
+  color: #d97706;
+  font-style: italic;
+  font-weight: 400;
+}
+
+.multi-spt .spt-marker {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.multi-spt .spt-diamond {
+  font-size: 12px;
+  color: #0ea5e9;
+}
+
+.multi-spt .spt-blow {
+  font-size: 10px;
+  color: #0369a1;
+  font-weight: 600;
+}
+
+.multi-spt .spt-marker.abnormal .spt-diamond {
+  color: #ef4444;
+}
+
+.multi-spt .spt-marker.abnormal .spt-blow {
+  color: #dc2626;
+}
+
+.legend-symbol.hole-end-symbol {
+  color: #6b7280;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .borehole-column {
+    min-width: 140px;
+  }
+
+  .column-spt.multi-spt {
+    width: 45px;
+  }
+
+  .compare-selection-bar {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+}
