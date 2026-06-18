@@ -11,4 +11,8 @@ export default defineConfig({
     host: "0.0.0.0",
     port: 5103,
   },
+  test: {
+    environment: "happy-dom",
+    include: ["src/**/*.test.ts"],
+  },
 });
