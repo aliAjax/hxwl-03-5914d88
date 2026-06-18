@@ -221,7 +221,7 @@ export default function ReviewWorkbench({
         <div className="review-stat-card">
           <span className="review-stat-icon">🔨</span>
           <div className="review-stat-content">
-            <span className="review-stat-label">标贯异常/未校核</span>
+            <span className="review-stat-label">异常标贯（待校核）</span>
             <strong className="review-stat-value">{stats.abnormalSPT}</strong>
           </div>
         </div>
