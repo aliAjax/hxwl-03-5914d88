@@ -114,14 +114,14 @@ console.log("=".repeat(70));
 console.log("🧪 岩土钻孔编录系统 - 浏览器冒烟测试");
 console.log("=".repeat(70));
 
-logStep("1/10 检查核心配置文件");
+logStep("1/11 检查核心配置文件");
 checkFileExists("package.json", "项目配置");
 checkFileExists("vite.config.ts", "Vite 配置");
 checkFileExists("tsconfig.json", "TypeScript 配置");
 checkFileExists("eslint.config.js", "ESLint 配置");
 checkFileExists(".husky/pre-commit", "Git 钩子");
 
-logStep("2/10 检查 package.json 基本配置");
+logStep("2/11 检查 package.json 基本配置");
 checkPackageJsonField("type", "module", "ESM 模式");
 checkPackageJsonScript("typecheck", /tsc.*noEmit/);
 checkPackageJsonScript("build", /vite build/);
@@ -131,14 +131,14 @@ checkPackageJsonScript("lint", /eslint/);
 checkPackageJsonScript("quality", /typecheck.*build.*test/);
 checkPackageJsonScript("quality:strict", /typecheck.*build.*coverage/);
 
-logStep("3/10 检查关键依赖安装");
+logStep("3/11 检查关键依赖安装");
 checkNodeModuleExists("typescript-eslint", "ESLint TypeScript 解析器");
 checkNodeModuleExists("fake-indexeddb", "IndexedDB 测试模拟");
 checkNodeModuleExists("@vitest/coverage-v8", "V8 覆盖率提供程序");
 checkNodeModuleExists("husky", "Git Hooks 工具");
 checkNodeModuleExists("lint-staged", "暂存文件 Lint 工具");
 
-logStep("4/10 检查核心源文件");
+logStep("4/11 检查核心源文件");
 checkFileExists("src/archive.ts", "归档导入导出模块");
 checkFileExists("src/db.ts", "IndexedDB 持久化模块");
 checkFileExists("src/types.ts", "类型定义");
@@ -147,7 +147,7 @@ checkFileExists("src/components/BoreholeChart.tsx", "单孔图表组件");
 checkFileExists("src/components/MultiBoreholeChart.tsx", "多孔对比图表");
 checkFileExists("src/hooks/useLayerDepthValidation.ts", "分层验证 Hook");
 
-logStep("5/10 检查核心测试文件");
+logStep("5/11 检查核心测试文件");
 checkFileExists("src/archive.test.ts", "归档模块测试");
 checkFileExists("src/db.test.ts", "IndexedDB 测试");
 checkFileExists("src/components/QualityCheckPanel.test.tsx", "质量面板测试");
@@ -156,7 +156,7 @@ checkFileExists("src/components/MultiBoreholeChart.test.tsx", "多孔图表测�
 checkFileExists("src/hooks/useLayerDepthValidation.test.ts", "分层 Hook 测试");
 checkFileExists("src/test/setup.ts", "测试初始化");
 
-logStep("6/10 检查 .gitignore 配置");
+logStep("6/11 检查 .gitignore 配置");
 const gitignorePath = path.join(projectRoot, ".gitignore");
 if (existsSync(gitignorePath)) {
   const gitignore = readFileSync(gitignorePath, "utf-8");
@@ -170,17 +170,22 @@ if (existsSync(gitignorePath)) {
   }
 }
 
-logStep("7/10 执行 ESLint 检查");
+logStep("7/11 检查 E2E 测试配置");
+checkFileExists("playwright.config.ts", "Playwright 配置");
+checkFileExists("e2e/smoke.spec.ts", "页面冒烟测试");
+checkNodeModuleExists("@playwright/test", "Playwright 测试框架");
+
+logStep("8/11 执行 ESLint 检查");
 runCommand("npm run lint", "ESLint 检查");
 
-logStep("8/10 执行 TypeScript 类型检查");
+logStep("9/11 执行 TypeScript 类型检查");
 runCommand("npm run typecheck", "类型检查");
 
-logStep("9/10 执行生产构建验证");
+logStep("10/11 执行生产构建验证");
 runCommand("npm run build", "生产构建");
 
-logStep("10/10 执行单元测试");
-runCommand("npm run test", "单元测试");
+logStep("11/11 执行浏览器页面冒烟测试");
+runCommand("npm run smoke:e2e", "Playwright 页面冒烟测试");
 
 console.log("\n" + "=".repeat(70));
 console.log("📊 冒烟测试结果");
@@ -197,7 +202,8 @@ if (failed > 0) {
   console.log("\n💡 可执行以下命令进行更全面的检查：");
   console.log("   npm run quality       - 运行完整质量门禁（类型+构建+测试）");
   console.log("   npm run quality:strict - 运行严格质量门禁（含覆盖率）");
+  console.log("   npm run smoke:e2e     - 仅运行 Playwright 页面冒烟测试");
+  console.log("   npm run smoke:all     - 运行 CLI 冒烟 + 页面冒烟测试");
   console.log("   npm run test:coverage - 运行测试并生成覆盖率报告");
-  console.log("   npm run test          - 运行所有单元测试");
   process.exit(0);
 }
