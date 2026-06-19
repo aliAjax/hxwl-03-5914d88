@@ -7,7 +7,6 @@ import type {
   BoreholeWaterLevelRecords,
   StratumLayer,
   SPTRecord,
-  SamplingRecord,
   WaterLevelRecord,
 } from "../types";
 import BoreholeChart from "./BoreholeChart";

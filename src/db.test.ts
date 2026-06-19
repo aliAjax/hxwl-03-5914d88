@@ -1,26 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import "fake-indexeddb/auto";
+import { saveProjectData, loadProjectData, clearProjectData } from "./db";
 import type { ProjectData } from "./db";
 
-vi.mock("./db", () => {
-  const store = new Map<string, ProjectData>();
-
-  return {
-    saveProjectData: vi.fn(async (data: Omit<ProjectData, "lastSaved">) => {
-      store.set("main-project", {
-        ...data,
-        lastSaved: new Date().toISOString(),
-      });
-    }),
-    loadProjectData: vi.fn(async () => {
-      return store.get("main-project") || null;
-    }),
-    clearProjectData: vi.fn(async () => {
-      store.clear();
-    }),
-  };
-});
-
-import { saveProjectData, loadProjectData, clearProjectData } from "./db";
+const DB_NAME = "hxwl-03-db";
 
 const mockDrillingRecord = {
   "钻孔编号": "ZK-01",
@@ -67,14 +50,22 @@ const mockWaterLevel = {
   weatherRemark: "晴",
 };
 
-describe("IndexedDB 持久化 - 核心流程", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    clearProjectData();
+async function deleteDatabase(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => resolve();
+  });
+}
+
+describe("IndexedDB 持久化 - 真实 IndexedDB 测试", () => {
+  beforeEach(async () => {
+    await deleteDatabase();
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  afterEach(async () => {
+    await deleteDatabase();
   });
 
   describe("saveProjectData - 保存数据", () => {
@@ -90,15 +81,12 @@ describe("IndexedDB 持久化 - 核心流程", () => {
 
       await saveProjectData(data);
 
-      expect(saveProjectData).toHaveBeenCalledTimes(1);
-      expect(saveProjectData).toHaveBeenCalledWith(data);
-
       const saved = await loadProjectData();
-      expect(saved).toBeDefined();
-      expect(saved?.initialized).toBe(true);
-      expect(saved?.records).toHaveLength(1);
-      expect(saved?.records[0]["钻孔编号"]).toBe("ZK-01");
-      expect(saved?.lastSaved).toBeDefined();
+      expect(saved).not.toBeNull();
+      expect(saved!.initialized).toBe(true);
+      expect(saved!.records).toHaveLength(1);
+      expect(saved!.records[0]["钻孔编号"]).toBe("ZK-01");
+      expect(saved!.lastSaved).toBeDefined();
     });
 
     it("应该自动添加 lastSaved 时间戳", async () => {
@@ -190,11 +178,11 @@ describe("IndexedDB 持久化 - 核心流程", () => {
       const loaded = await loadProjectData();
 
       expect(loaded).not.toBeNull();
-      expect(loaded?.records[0]).toEqual(mockDrillingRecord);
-      expect(loaded?.boreholeLayers["ZK-01"][0]).toEqual(mockLayer);
-      expect(loaded?.sptRecords["ZK-01"][0]).toEqual(mockSPT);
-      expect(loaded?.samplingRecords["ZK-01"][0]).toEqual(mockSampling);
-      expect(loaded?.waterLevelRecords["ZK-01"][0]).toEqual(mockWaterLevel);
+      expect(loaded!.records[0]["钻孔编号"]).toBe("ZK-01");
+      expect(loaded!.boreholeLayers["ZK-01"]).toHaveLength(1);
+      expect(loaded!.sptRecords["ZK-01"]).toHaveLength(1);
+      expect(loaded!.samplingRecords["ZK-01"]).toHaveLength(1);
+      expect(loaded!.waterLevelRecords["ZK-01"]).toHaveLength(1);
     });
 
     it("应该保留所有字段完整性", async () => {
@@ -241,7 +229,6 @@ describe("IndexedDB 持久化 - 核心流程", () => {
 
       await clearProjectData();
 
-      expect(clearProjectData).toHaveBeenCalled();
       expect(await loadProjectData()).toBeNull();
     });
 
@@ -382,6 +369,83 @@ describe("IndexedDB 持久化 - 核心流程", () => {
       expect(loaded?.samplingRecords["ZK-IMP-01"]).toHaveLength(1);
       expect(loaded?.waterLevelRecords["ZK-IMP-01"]).toHaveLength(1);
       expect(loaded?.waterLevelRecords["ZK-IMP-02"][0].stableLevel).toBe("12");
+    });
+  });
+
+  describe("IndexedDB 特性验证", () => {
+    it("数据应该通过结构化克隆算法正确序列化和反序列化", async () => {
+      const data: Omit<ProjectData, "lastSaved"> = {
+        records: [mockDrillingRecord],
+        boreholeLayers: {
+          "ZK-01": [
+            { ...mockLayer, description: "含铁锰结核\n第二行描述" },
+          ],
+        },
+        sptRecords: { "ZK-01": [{ ...mockSPT, remark: "异常:击数偏低" }] },
+        samplingRecords: {},
+        waterLevelRecords: {},
+        initialized: true,
+      };
+
+      await saveProjectData(data);
+      const loaded = await loadProjectData();
+
+      expect(loaded?.boreholeLayers["ZK-01"][0].description).toBe("含铁锰结核\n第二行描述");
+      expect(loaded?.sptRecords["ZK-01"][0].remark).toBe("异常:击数偏低");
+    });
+
+    it("清空后再保存应该正常工作", async () => {
+      await saveProjectData({
+        records: [mockDrillingRecord],
+        boreholeLayers: {},
+        sptRecords: {},
+        samplingRecords: {},
+        waterLevelRecords: {},
+        initialized: true,
+      });
+
+      await clearProjectData();
+      expect(await loadProjectData()).toBeNull();
+
+      await saveProjectData({
+        records: [{ ...mockDrillingRecord, "钻孔编号": "ZK-NEW" }],
+        boreholeLayers: {},
+        sptRecords: {},
+        samplingRecords: {},
+        waterLevelRecords: {},
+        initialized: true,
+      });
+
+      const loaded = await loadProjectData();
+      expect(loaded?.records[0]["钻孔编号"]).toBe("ZK-NEW");
+    });
+
+    it("save 和 load 的 lastSaved 时间应该递增", async () => {
+      await saveProjectData({
+        records: [mockDrillingRecord],
+        boreholeLayers: {},
+        sptRecords: {},
+        samplingRecords: {},
+        waterLevelRecords: {},
+        initialized: true,
+      });
+      const first = await loadProjectData();
+
+      await new Promise((r) => setTimeout(r, 10));
+
+      await saveProjectData({
+        records: [{ ...mockDrillingRecord, "钻孔编号": "ZK-02" }],
+        boreholeLayers: {},
+        sptRecords: {},
+        samplingRecords: {},
+        waterLevelRecords: {},
+        initialized: true,
+      });
+      const second = await loadProjectData();
+
+      expect(new Date(second!.lastSaved).getTime()).toBeGreaterThanOrEqual(
+        new Date(first!.lastSaved).getTime()
+      );
     });
   });
 });

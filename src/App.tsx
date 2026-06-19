@@ -5,7 +5,6 @@ import type {
   BoreholeLayers,
   SPTRecord,
   BoreholeSPTRecords,
-  SamplingRecord,
   BoreholeSamplingRecords,
   WaterLevelRecord,
   BoreholeWaterLevelRecords,
@@ -13,17 +12,11 @@ import type {
   Role,
   ImportPreviewResult,
   ImportResult,
-  ArchiveData,
-  BoreholeImportItem,
   ConflictCategory,
   ConflictResolution,
-  CategoryDiff,
-  RecordDiff,
-  FieldDiff,
-  BoreholeConflictDetails,
 } from "./types";
 import { rolePermissions, roleDescriptions, CATEGORY_LABELS } from "./types";
-import { saveProjectData, loadProjectData, clearProjectData, type ProjectData } from "./db";
+import { saveProjectData, loadProjectData, clearProjectData } from "./db";
 import {
   createArchive,
   downloadArchive,
@@ -50,7 +43,7 @@ const soilColorOptions = ["褐黄色", "黄褐色", "灰黄色", "灰白色", "�
 const densityOptions = ["松散", "稍密", "中密", "密实", "可塑", "硬塑", "坚硬", "流塑"];
 const sampleTypeOptions = ["原状样", "扰动样", "岩芯样", "水样"];
 
-const generateId = () => Math.random().toString(36).slice(2, 11);
+const _generateId = () => Math.random().toString(36).slice(2, 11);
 
 const initialLayers: BoreholeLayers = {
   "ZK-18": [
@@ -308,14 +301,14 @@ function App() {
     setFilters,
     hasActiveFilters,
     filteredRecords,
-    hasLayerGap,
-    hasAbnormalSPT,
-    isMissingStableWaterLevel,
+    hasLayerGap: _hasLayerGap,
+    hasAbnormalSPT: _hasAbnormalSPT,
+    isMissingStableWaterLevel: _isMissingStableWaterLevel,
   } = useRecordFilter({ records, boreholeLayers, sptRecords, waterLevelRecords });
 
   const {
     layerForm,
-    setLayerForm,
+    setLayerForm: _setLayerForm,
     editingLayerId,
     setEditingLayerId,
     layerErrors,
@@ -326,13 +319,13 @@ function App() {
     setGapMessage,
     adjacentLayerHint,
     autoFilledStartDepth,
-    setAutoFilledStartDepth,
-    currentLayers,
+    setAutoFilledStartDepth: _setAutoFilledStartDepth,
+    currentLayers: _currentLayers,
     sortedLayers,
-    findLayerByDepth,
+    findLayerByDepth: _findLayerByDepth,
     getLayerLithology,
-    validateLayerForm,
-    checkOverlapAndGaps,
+    validateLayerForm: _validateLayerForm,
+    checkOverlapAndGaps: _checkOverlapAndGaps,
     checkDepthInLayers,
     handleLayerInputChange,
     prepareNewLayerForm,
@@ -347,28 +340,28 @@ function App() {
 
   const {
     sptForm,
-    setSPTForm,
+    setSPTForm: _setSPTForm,
     editingSPTId,
-    setEditingSPTId,
+    setEditingSPTId: _setEditingSPTId,
     sptErrors,
-    setSPTErrors,
+    setSPTErrors: _setSPTErrors,
     sptValidationMessage,
-    setSPTValidationMessage,
+    setSPTValidationMessage: _setSPTValidationMessage,
     samplingForm,
-    setSamplingForm,
+    setSamplingForm: _setSamplingForm,
     editingSamplingId,
-    setEditingSamplingId,
+    setEditingSamplingId: _setEditingSamplingId,
     samplingErrors,
-    setSamplingErrors,
+    setSamplingErrors: _setSamplingErrors,
     samplingValidationMessage,
-    setSamplingValidationMessage,
+    setSamplingValidationMessage: _setSamplingValidationMessage,
     sortedSPTRecords,
     sortedSamplingRecords,
     sptStats,
     samplingStats,
-    getBoreholeMaxSPT,
-    validateSPTForm,
-    validateSamplingForm,
+    getBoreholeMaxSPT: _getBoreholeMaxSPT,
+    validateSPTForm: _validateSPTForm,
+    validateSamplingForm: _validateSamplingForm,
     handleSPTInputChange,
     handleAddSPTRecord,
     handleUpdateSPTRecord,
@@ -397,20 +390,20 @@ function App() {
 
   const {
     waterLevelForm,
-    setWaterLevelForm,
+    setWaterLevelForm: _setWaterLevelForm,
     editingWaterLevelId,
-    setEditingWaterLevelId,
+    setEditingWaterLevelId: _setEditingWaterLevelId,
     waterLevelErrors,
-    setWaterLevelErrors,
+    setWaterLevelErrors: _setWaterLevelErrors,
     waterLevelValidationMessage,
-    setWaterLevelValidationMessage,
+    setWaterLevelValidationMessage: _setWaterLevelValidationMessage,
     sortedWaterLevelRecords,
     latestWaterLevel,
     latestStableWaterLevel,
     getLatestStableWaterLevel,
     getWaterLevelDisplayText,
     getLatestWaterLevelObservationText,
-    validateWaterLevelForm,
+    validateWaterLevelForm: _validateWaterLevelForm,
     handleWaterLevelInputChange,
     handleAddWaterLevelRecord,
     handleUpdateWaterLevelRecord,
@@ -420,7 +413,7 @@ function App() {
     resetFormsOnBoreholeChange: resetWaterLevelFormsOnBoreholeChange,
   } = useWaterLevelDisplay(waterLevelRecords, setWaterLevelRecords, selectedBorehole);
 
-  const handleSelectBorehole = (boreholeId: string) => {
+  const handleSelectBorehole = useCallback((boreholeId: string) => {
     setSelectedBorehole(boreholeId);
     setTimeout(() => {
       prepareNewLayerForm(boreholeId);
@@ -428,7 +421,14 @@ function App() {
     setEditingLayerId(null); setLayerErrors({}); setLayerValidationMessage("");
     resetSampleFormsOnBoreholeChange();
     resetWaterLevelFormsOnBoreholeChange();
-  };
+  }, [prepareNewLayerForm, setEditingLayerId, setLayerErrors, setLayerValidationMessage, resetSampleFormsOnBoreholeChange, resetWaterLevelFormsOnBoreholeChange]);
+
+  const handleEditRecord = useCallback((record: DrillingRecord) => {
+    if (!permissions.canEditRecord) return;
+    setFormData({ ...record });
+    setEditingRecordId(record["钻孔编号"]);
+    setErrors({});
+  }, [permissions.canEditRecord]);
 
   const handleToggleBoreholeForCompare = (boreholeId: string) => {
     setSelectedBoreholesForCompare(prev => {
@@ -492,7 +492,7 @@ function App() {
       }
     }, 50);
     }
-  }, [records, boreholeLayers, sptRecords, samplingRecords, waterLevelRecords]);
+  }, [records, boreholeLayers, sptRecords, samplingRecords, waterLevelRecords, handleEditLayer, handleEditRecord, handleEditSPTRecord, handleEditSamplingRecord, handleEditWaterLevelRecord, handleSelectBorehole]);
 
   const compareBoreholeData = useMemo(() => {
     return selectedBoreholesForCompare
@@ -531,7 +531,7 @@ function App() {
     }
     if (prevEnd < holeDepth - 0.001) gaps.push(`${prevEnd.toFixed(2)}m ~ ${holeDepth.toFixed(2)}m`);
     setGapMessage(gaps.length > 0 ? `存在缺口区间：${gaps.join("、")}` : "");
-  }, [sortedLayers, holeDepth]);
+  }, [sortedLayers, holeDepth, setGapMessage]);
 
   useEffect(() => {
     if (!selectedBorehole || isLoading) return;
@@ -542,7 +542,7 @@ function App() {
       setTimeout(() => checkAdjacentLayerImpact(), 0);
     }, 50);
     return () => clearTimeout(timer);
-  }, [selectedBorehole, isLoading, editingLayerId]);
+  }, [selectedBorehole, isLoading, editingLayerId, autoFilledStartDepth, checkAdjacentLayerImpact, layerForm.startDepth, prepareNewLayerForm]);
 
   useEffect(() => {
     if (!selectedBorehole || isLoading || editingLayerId) return;
@@ -694,13 +694,12 @@ function App() {
       text += `\n${r["钻孔编号"]}（共${sortedWL.length}次观测，稳定水位${stableCount}次）：\n`;
       sortedWL.forEach((w, i) => {
         const status = w.stableLevel && w.stableLevel.trim() ? "稳定" : "初见";
-        const level = w.stableLevel && w.stableLevel.trim() ? w.stableLevel : w.firstSeenLevel;
         text += `  ${String(i + 1).padStart(2, "0")}. ${w.observationTime || "时间未记录"} | 初见${w.firstSeenLevel || "-"}m | 稳定${w.stableLevel || "-"}m | ${status}${w.weatherRemark ? " | " + w.weatherRemark : ""}\n`;
       });
     });
     text += `────────────────────────────\n`;
     return text;
-  }, [summaryStats, filteredRecords, sptRecords, samplingRecords, boreholeLayers, waterLevelRecords, getWaterLevelDisplayText]);
+  }, [summaryStats, filteredRecords, sptRecords, samplingRecords, boreholeLayers, waterLevelRecords, getWaterLevelDisplayText, getLatestWaterLevelObservationText]);
 
   const handleCopySummary = useCallback(async () => {
     const text = generateTextSummary();
@@ -746,13 +745,6 @@ function App() {
     setSamplingRecords(prev => ({ ...prev, [boreholeId]: [] }));
     setWaterLevelRecords(prev => ({ ...prev, [boreholeId]: [] }));
     setFormData(emptyForm); setErrors({});
-  };
-
-  const handleEditRecord = (record: DrillingRecord) => {
-    if (!permissions.canEditRecord) return;
-    setFormData({ ...record });
-    setEditingRecordId(record["钻孔编号"]);
-    setErrors({});
   };
 
   const handleCancelEditRecord = () => {
@@ -865,7 +857,7 @@ function App() {
     }
   }, [permissions.canEditRecord, editingRecordId]);
 
-  const allSPTForSummary = useMemo(() => {
+  const _allSPTForSummary = useMemo(() => {
     const targetRecords = filteredRecords;
     const result: { boreholeId: string; depth: string; blowCount: string; isAbnormal: boolean; lithology: string; remark: string }[] = [];
     targetRecords.forEach(r => {
@@ -878,7 +870,7 @@ function App() {
     return result.sort((a, b) => parseFloat(a.depth) - parseFloat(b.depth));
   }, [filteredRecords, sptRecords, getLayerLithology]);
 
-  const allSamplingForSummary = useMemo(() => {
+  const _allSamplingForSummary = useMemo(() => {
     const targetRecords = filteredRecords;
     const result: { boreholeId: string; depth: string; sampleType: string; sampleNumber: string; lithology: string; remark: string }[] = [];
     targetRecords.forEach(r => {
@@ -2479,12 +2471,12 @@ function App() {
                       const timeB = b.observationTime ? new Date(b.observationTime).getTime() : 0;
                       return timeA - timeB;
                     });
-                    const stableCount = sortedWL.filter(w => w.stableLevel && w.stableLevel.trim()).length;
+                    const _stableCount = sortedWL.filter(w => w.stableLevel && w.stableLevel.trim()).length;
                     return (
                       <div key={r["钻孔编号"]} className="summary-borehole-block">
                         <h5>{r["钻孔编号"]} <span className="tag">{sortedWL.length}次</span></h5>
                         <div className="summary-sampling-items">
-                          {sortedWL.map((w, i) => {
+                          {sortedWL.map((w, _i) => {
                             const isStable = w.stableLevel && w.stableLevel.trim();
                             return (
                               <div key={w.id} className={`summary-sampling-item ${!isStable ? "is-abnormal" : ""}`}>

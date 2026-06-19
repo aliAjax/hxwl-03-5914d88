@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { StratumLayer, SPTRecord, WaterLevelRecord, DrillingRecord } from "../types";
+import type { StratumLayer, SPTRecord, WaterLevelRecord } from "../types";
 
 interface BoreholeData {
   boreholeId: string;
@@ -581,7 +581,7 @@ export default function MultiBoreholeChart({ boreholes }: MultiBoreholeChartProp
                           style={{ height: `${chartBase.chartHeight}px` }}
                         >
                           {bh.layerHeights.map(
-                            ({ layer, top, height, isThin }, idx) => (
+                            ({ layer, top, height, isThin }, _idx) => (
                               <div
                                 key={layer.id}
                                 className={`lithology-cell ${isThin ? "thin-layer" : ""}`}

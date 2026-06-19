@@ -59,7 +59,7 @@ export const loadProjectData = async (): Promise<ProjectData | null> => {
     const store = transaction.objectStore(STORE_NAME);
     const request = store.get(DATA_KEY);
     request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result as ProjectData | null);
+    request.onsuccess = () => resolve(request.result ?? null);
     transaction.oncomplete = () => db.close();
   });
 };

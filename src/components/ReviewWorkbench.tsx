@@ -10,8 +10,6 @@ import type {
   LayerGapItem,
   DepthAnomalyItem,
   ReviewWorkbenchStats,
-  StratumLayer,
-  SPTRecord,
 } from "../types";
 
 interface ReviewWorkbenchProps {
@@ -169,7 +167,7 @@ export default function ReviewWorkbench({
   };
 
   const startEditSPTCheck = (item: AbnormalSPTItem) => {
-    const layers = boreholeLayers[item.boreholeId] || [];
+    const _layers = boreholeLayers[item.boreholeId] || [];
     const bhSPT = sptRecords[item.boreholeId] || [];
     const sptRecord = bhSPT.find(s => s.id === item.sptId);
     setEditingCheck({ type: "spt", boreholeId: item.boreholeId, itemId: item.sptId });

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import type { DrillingRecord, BoreholeLayers, BoreholeSPTRecords, BoreholeWaterLevelRecords } from "../types";
 
 export interface FilterState {
@@ -30,7 +30,7 @@ export function useRecordFilter({
 }: UseRecordFilterParams) {
   const [filters, setFilters] = useState<FilterState>(initialFilters);
 
-  const hasLayerGap = (boreholeId: string): boolean => {
+  const hasLayerGap = useCallback((boreholeId: string): boolean => {
     const layers = boreholeLayers[boreholeId] || [];
     if (layers.length === 0) return false;
     const record = records.find((r) => r["钻孔编号"] === boreholeId);
@@ -46,18 +46,18 @@ export function useRecordFilter({
     }
     if (prevEnd < holeDepth - 0.001) return true;
     return false;
-  };
+  }, [boreholeLayers, records]);
 
-  const hasAbnormalSPT = (boreholeId: string): boolean => {
+  const hasAbnormalSPT = useCallback((boreholeId: string): boolean => {
     const bhSPT = sptRecords[boreholeId] || [];
     return bhSPT.some((spt) => spt.isAbnormal);
-  };
+  }, [sptRecords]);
 
-  const isMissingStableWaterLevel = (boreholeId: string): boolean => {
+  const isMissingStableWaterLevel = useCallback((boreholeId: string): boolean => {
     const bhWL = waterLevelRecords[boreholeId] || [];
     if (bhWL.length === 0) return true;
     return !bhWL.some((wl) => wl.stableLevel && wl.stableLevel.trim());
-  };
+  }, [waterLevelRecords]);
 
   const hasActiveFilters = useMemo(() => {
     return (
@@ -89,7 +89,7 @@ export function useRecordFilter({
       }
       return true;
     });
-  }, [records, filters, hasActiveFilters, boreholeLayers, sptRecords, waterLevelRecords]);
+  }, [records, filters, hasActiveFilters, hasAbnormalSPT, hasLayerGap, isMissingStableWaterLevel]);
 
   const setFilter = <K extends keyof FilterState>(key: K, value: FilterState[K]) => {
     setFilters((prev) => ({ ...prev, [key]: value }));

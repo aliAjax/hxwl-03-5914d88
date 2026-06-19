@@ -479,7 +479,7 @@ export default function BoreholeChart({
                     className="column-body"
                     style={{ height: `${chartData.chartHeight}px` }}
                   >
-                    {chartData.layerHeights.map(({ layer, top, height, isThin }, idx) => (
+                    {chartData.layerHeights.map(({ layer, top, height, isThin }, _idx) => (
                       <div
                         key={layer.id}
                         className={`depth-cell ${isThin ? "thin-layer" : ""}`}

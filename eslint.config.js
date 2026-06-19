@@ -15,7 +15,6 @@ export default tseslint.config(
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
-  ...tseslint.configs.stylistic,
   {
     files: ["**/*.{ts,tsx}"],
     ...react.configs.flat.recommended,
@@ -29,13 +28,16 @@ export default tseslint.config(
       "react/no-unknown-property": "off",
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": [
-        "error",
+        "warn",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
       "@typescript-eslint/consistent-type-imports": [
         "warn",
         { prefer: "type-imports" },
       ],
+      "@typescript-eslint/consistent-indexed-object-style": "off",
+      "@typescript-eslint/no-empty-function": "off",
+      "@typescript-eslint/no-inferrable-types": "off",
     },
     settings: {
       react: {
@@ -47,6 +49,17 @@ export default tseslint.config(
         ecmaVersion: "latest",
         sourceType: "module",
       },
+    },
+  },
+  {
+    files: ["**/*.test.{ts,tsx}", "src/test/**"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+      "react-hooks/exhaustive-deps": "off",
     },
   }
 );

@@ -8,11 +8,6 @@ import type {
   QualityIssue,
   QualityIssueCategory,
   QualityCheckStats,
-  QUALITY_CATEGORY_LABELS,
-  StratumLayer,
-  SPTRecord,
-  SamplingRecord,
-  WaterLevelRecord,
 } from "../types";
 import { QUALITY_CATEGORY_LABELS as CATEGORY_LABELS } from "../types";
 

@@ -218,7 +218,9 @@ export const normalizeDepthValue = (value: string): { normalized: string; wasCon
   return { normalized: String(num), wasConverted };
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mapLegacyFields = <T>(obj: any, fieldMap: Record<string, keyof T>): T => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result: any = {};
   for (const key of Object.keys(obj)) {
     if (fieldMap[key] && obj[key] !== undefined && obj[key] !== "") {
@@ -231,12 +233,14 @@ const mapLegacyFields = <T>(obj: any, fieldMap: Record<string, keyof T>): T => {
 };
 
 const normalizeDrillingRecord = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   rec: any,
   warnings: string[],
   changes: DepthNormalizationChange[],
   normStats: NormalizationStats
 ): DrillingRecord => {
   const mapped = mapLegacyFields<DrillingRecord>(rec, LEGACY_FIELD_MAP);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const record: any = {
     "钻孔编号": mapped["钻孔编号"] || "",
     "孔深": mapped["孔深"] || "",
@@ -281,6 +285,7 @@ const normalizeDrillingRecord = (
 };
 
 const normalizeStratumLayer = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   layer: any,
   warnings: string[],
   boreholeId: string,
@@ -332,6 +337,7 @@ const normalizeStratumLayer = (
 };
 
 const normalizeSPTRecord = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   spt: any,
   warnings: string[],
   boreholeId: string,
@@ -371,6 +377,7 @@ const normalizeSPTRecord = (
 };
 
 const normalizeSamplingRecord = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   spl: any,
   warnings: string[],
   boreholeId: string,
@@ -410,6 +417,7 @@ const normalizeSamplingRecord = (
 };
 
 const normalizeWaterLevelRecord = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   wl: any,
   warnings: string[],
   boreholeId: string,
@@ -489,8 +497,10 @@ const mergeCheckStatus = (
 ): (StratumLayer | SPTRecord | SamplingRecord | WaterLevelRecord)[] => {
   const result = [...archiveItems];
   for (const local of localItems) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const localVal = (local as any)[matchKey];
     if (!localVal) continue;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const archiveIdx = result.findIndex((a) => (a as any)[matchKey] === localVal);
     if (archiveIdx >= 0) {
       if (local.isChecked && !result[archiveIdx].isChecked) {
@@ -561,6 +571,7 @@ const createEmptyConflictDetails = (): BoreholeConflictDetails => ({
   },
 });
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const valueEqual = (a: any, b: any): boolean => {
   if (a === b) return true;
   const aStr = a === undefined || a === null ? "" : String(a);
@@ -606,20 +617,24 @@ interface RecordCompareConfig {
 }
 
 const compareRecordArrays = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   localItems: Record<string, any>[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   archiveItems: Record<string, any>[],
   config: RecordCompareConfig,
   category: ConflictCategory
 ): CategoryDiff => {
   const diff: CategoryDiff = createEmptyCategoryDiff(category);
-  const { matchKey, matchLabel, fields, excludeFields = [] } = config;
+  const { matchKey, matchLabel: _matchLabel, fields, excludeFields = [] } = config;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const localMap = new Map<string, Record<string, any>>();
   for (const item of localItems) {
     const key = String(item[matchKey] ?? item.id ?? "");
     if (key) localMap.set(key, item);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const archiveMap = new Map<string, Record<string, any>>();
   for (const item of archiveItems) {
     const key = String(item[matchKey] ?? item.id ?? "");
@@ -728,7 +743,9 @@ const computeBoreholeConflictDetails = (
   details.categories.basicInfo = compareBasicInfo(localRecord, archiveRecord);
 
   details.categories.layers = compareRecordArrays(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     localLayers as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     archiveLayers as any,
     {
       matchKey: "startDepth",
@@ -740,7 +757,9 @@ const computeBoreholeConflictDetails = (
   );
 
   details.categories.spt = compareRecordArrays(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     localSPT as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     archiveSPT as any,
     {
       matchKey: "depth",
@@ -752,7 +771,9 @@ const computeBoreholeConflictDetails = (
   );
 
   details.categories.sampling = compareRecordArrays(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     localSampling as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     archiveSampling as any,
     {
       matchKey: "sampleNumber",
@@ -764,7 +785,9 @@ const computeBoreholeConflictDetails = (
   );
 
   details.categories.waterLevel = compareRecordArrays(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     localWater as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     archiveWater as any,
     {
       matchKey: "observationTime",
@@ -784,7 +807,7 @@ const applyCategoryResolution = <T>(
   localItems: T[],
   archiveItems: T[],
   resolution: ConflictResolution,
-  matchKey: string
+  _matchKey: string
 ): T[] => {
   if (resolution === "archive") {
     return archiveItems;
@@ -1013,7 +1036,7 @@ export const previewImport = async (archive: ArchiveData): Promise<ImportPreview
     const checkInfo = boreholeCheckInfoMap.get(boreholeId);
     const normChanges = boreholeNormalizationChanges.get(boreholeId) || [];
 
-    let detailParts: string[] = [];
+    const detailParts: string[] = [];
     const layerCount = normalizedData.boreholeLayers[boreholeId]?.length || 0;
     const sptCount = normalizedData.sptRecords[boreholeId]?.length || 0;
     detailParts.push(`孔深${record["孔深"]}m · ${layerCount}层 · ${sptCount}次标贯`);

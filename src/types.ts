@@ -202,8 +202,8 @@ export interface RecordDiff {
   matchKey: string;
   matchValue: string;
   fields: FieldDiff[];
-  localRecord?: Record<string, any>;
-  archiveRecord?: Record<string, any>;
+  localRecord?: Record<string, unknown>;
+  archiveRecord?: Record<string, unknown>;
 }
 
 export interface CategoryDiff {

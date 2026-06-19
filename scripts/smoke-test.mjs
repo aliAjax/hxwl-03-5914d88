@@ -36,7 +36,7 @@ function checkFileExists(filePath, description) {
 function checkPackageJsonScript(scriptName, expectedPattern) {
   const pkgPath = path.join(projectRoot, "package.json");
   if (!existsSync(pkgPath)) {
-    checkFail(`package.json 不存在`);
+    checkFail("package.json 不存在");
     return false;
   }
 
@@ -58,6 +58,35 @@ function checkPackageJsonScript(scriptName, expectedPattern) {
     return true;
   } catch (e) {
     checkFail(`解析 package.json 失败: ${e.message}`);
+    return false;
+  }
+}
+
+function checkPackageJsonField(field, expectedValue, description) {
+  const pkgPath = path.join(projectRoot, "package.json");
+  try {
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+    const value = field.split(".").reduce((o, k) => o?.[k], pkg);
+    if (expectedValue ? value === expectedValue : value !== undefined) {
+      checkPass(`${description}: ${value}`);
+      return true;
+    } else {
+      checkFail(`${description} 不符合预期 (实际: ${value}, 期望: ${expectedValue})`);
+      return false;
+    }
+  } catch (e) {
+    checkFail(`检查 ${description} 失败: ${e.message}`);
+    return false;
+  }
+}
+
+function checkNodeModuleExists(moduleName, description) {
+  const fullPath = path.join(projectRoot, "node_modules", moduleName);
+  if (existsSync(fullPath)) {
+    checkPass(`${description} 已安装: ${moduleName}`);
+    return true;
+  } else {
+    checkFail(`${description} 未安装: ${moduleName}`);
     return false;
   }
 }
@@ -85,22 +114,31 @@ console.log("=".repeat(70));
 console.log("🧪 岩土钻孔编录系统 - 浏览器冒烟测试");
 console.log("=".repeat(70));
 
-logStep("1/7 检查核心配置文件");
+logStep("1/10 检查核心配置文件");
 checkFileExists("package.json", "项目配置");
 checkFileExists("vite.config.ts", "Vite 配置");
 checkFileExists("tsconfig.json", "TypeScript 配置");
 checkFileExists("eslint.config.js", "ESLint 配置");
 checkFileExists(".husky/pre-commit", "Git 钩子");
 
-logStep("2/7 检查 package.json 质量门禁脚本");
+logStep("2/10 检查 package.json 基本配置");
+checkPackageJsonField("type", "module", "ESM 模式");
 checkPackageJsonScript("typecheck", /tsc.*noEmit/);
 checkPackageJsonScript("build", /vite build/);
 checkPackageJsonScript("test", /vitest run/);
 checkPackageJsonScript("test:coverage", /vitest.*coverage/);
+checkPackageJsonScript("lint", /eslint/);
 checkPackageJsonScript("quality", /typecheck.*build.*test/);
 checkPackageJsonScript("quality:strict", /typecheck.*build.*coverage/);
 
-logStep("3/7 检查核心源文件");
+logStep("3/10 检查关键依赖安装");
+checkNodeModuleExists("typescript-eslint", "ESLint TypeScript 解析器");
+checkNodeModuleExists("fake-indexeddb", "IndexedDB 测试模拟");
+checkNodeModuleExists("@vitest/coverage-v8", "V8 覆盖率提供程序");
+checkNodeModuleExists("husky", "Git Hooks 工具");
+checkNodeModuleExists("lint-staged", "暂存文件 Lint 工具");
+
+logStep("4/10 检查核心源文件");
 checkFileExists("src/archive.ts", "归档导入导出模块");
 checkFileExists("src/db.ts", "IndexedDB 持久化模块");
 checkFileExists("src/types.ts", "类型定义");
@@ -109,7 +147,7 @@ checkFileExists("src/components/BoreholeChart.tsx", "单孔图表组件");
 checkFileExists("src/components/MultiBoreholeChart.tsx", "多孔对比图表");
 checkFileExists("src/hooks/useLayerDepthValidation.ts", "分层验证 Hook");
 
-logStep("4/7 检查核心测试文件");
+logStep("5/10 检查核心测试文件");
 checkFileExists("src/archive.test.ts", "归档模块测试");
 checkFileExists("src/db.test.ts", "IndexedDB 测试");
 checkFileExists("src/components/QualityCheckPanel.test.tsx", "质量面板测试");
@@ -118,7 +156,7 @@ checkFileExists("src/components/MultiBoreholeChart.test.tsx", "多孔图表测�
 checkFileExists("src/hooks/useLayerDepthValidation.test.ts", "分层 Hook 测试");
 checkFileExists("src/test/setup.ts", "测试初始化");
 
-logStep("5/7 检查 .gitignore 配置");
+logStep("6/10 检查 .gitignore 配置");
 const gitignorePath = path.join(projectRoot, ".gitignore");
 if (existsSync(gitignorePath)) {
   const gitignore = readFileSync(gitignorePath, "utf-8");
@@ -132,11 +170,17 @@ if (existsSync(gitignorePath)) {
   }
 }
 
-logStep("6/7 执行 TypeScript 类型检查");
+logStep("7/10 执行 ESLint 检查");
+runCommand("npm run lint", "ESLint 检查");
+
+logStep("8/10 执行 TypeScript 类型检查");
 runCommand("npm run typecheck", "类型检查");
 
-logStep("7/7 执行构建验证");
-const buildResult = runCommand("npm run build", "生产构建");
+logStep("9/10 执行生产构建验证");
+runCommand("npm run build", "生产构建");
+
+logStep("10/10 执行单元测试");
+runCommand("npm run test", "单元测试");
 
 console.log("\n" + "=".repeat(70));
 console.log("📊 冒烟测试结果");
@@ -150,10 +194,10 @@ if (failed > 0) {
   process.exit(1);
 } else {
   console.log("\n🎉 所有冒烟检查通过！质量门禁配置正常");
-  console.log(`\n💡 可执行以下命令进行更全面的检查：`);
-  console.log(`   npm run quality       - 运行完整质量门禁（类型+构建+测试）`);
-  console.log(`   npm run quality:strict - 运行严格质量门禁（含覆盖率）`);
-  console.log(`   npm run test:coverage - 运行测试并生成覆盖率报告`);
-  console.log(`   npm run test          - 运行所有单元测试`);
+  console.log("\n💡 可执行以下命令进行更全面的检查：");
+  console.log("   npm run quality       - 运行完整质量门禁（类型+构建+测试）");
+  console.log("   npm run quality:strict - 运行严格质量门禁（含覆盖率）");
+  console.log("   npm run test:coverage - 运行测试并生成覆盖率报告");
+  console.log("   npm run test          - 运行所有单元测试");
   process.exit(0);
 }

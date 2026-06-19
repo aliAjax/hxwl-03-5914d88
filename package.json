@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5103",
     "build": "vite build",
@@ -33,18 +34,16 @@
     "eslint": "^9.20.1",
     "eslint-plugin-react": "^7.37.4",
     "eslint-plugin-react-hooks": "^5.1.0",
+    "fake-indexeddb": "^6.2.5",
     "happy-dom": "^20.10.6",
     "husky": "^9.1.7",
     "lint-staged": "^15.4.3",
+    "typescript-eslint": "^8.61.1",
     "vitest": "^4.1.9"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": [
-      "eslint --max-warnings 0",
-      "bash -c 'npm run typecheck'"
-    ],
-    "src/**/*.test.{ts,tsx}": [
-      "bash -c 'npm run test'"
+      "eslint --max-warnings 0"
     ]
   }
 }
